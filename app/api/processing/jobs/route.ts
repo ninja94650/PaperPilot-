@@ -35,9 +35,14 @@ export async function POST(request: Request) {
   try { admin = createAdminClient(); }
   catch { return NextResponse.json({ error: "Secure job creation is not configured on this deployment." }, { status: 503 }); }
 
-  const { data: existing } = await admin.from("processing_jobs").select("id,status,progress_percent,created_at")
+  const { data: existing } = await admin.from("processing_jobs").select("id,status,progress_percent,created_at,document_id,tool")
     .eq("owner_id", user.id).eq("idempotency_key", idempotencyKey).maybeSingle();
-  if (existing) return NextResponse.json({ job: existing, reused: true }, { status: 200 });
+  if (existing) {
+    if (existing.document_id !== document.id || existing.tool !== tool) {
+      return NextResponse.json({ error: "This idempotency key was already used for a different operation." }, { status: 409 });
+    }
+    return NextResponse.json({ job: existing, reused: true }, { status: 200 });
+  }
 
   const { data: job, error: insertError } = await admin.from("processing_jobs").insert({
     owner_id: user.id,
@@ -55,9 +60,9 @@ export async function POST(request: Request) {
 
   if (insertError || !job) {
     if (insertError?.code === "23505") {
-      const { data: duplicate } = await admin.from("processing_jobs").select("id,status,progress_percent,created_at")
+      const { data: duplicate } = await admin.from("processing_jobs").select("id,status,progress_percent,created_at,document_id,tool")
         .eq("owner_id", user.id).eq("idempotency_key", idempotencyKey).maybeSingle();
-      if (duplicate) return NextResponse.json({ job: duplicate, reused: true });
+      if (duplicate && duplicate.document_id === document.id && duplicate.tool === tool) return NextResponse.json({ job: duplicate, reused: true });
     }
     return NextResponse.json({ error: "Could not create a processing job." }, { status: 500 });
   }
