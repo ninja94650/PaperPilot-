@@ -8,7 +8,7 @@ import {
   RotateCw, ScanText, Scissors, ShieldCheck, Sparkles, WandSparkles, X, Zap,
   Signature, LoaderCircle, Download, Upload, PanelLeftClose, Trash2
 } from "lucide-react";
-import { addTextToPdf, extractPages, mergePdfs, rotatePages } from "@/lib/pdf-tools";
+import { addTextToPdf, extractPages, mergePdfs, rotatePages, splitPdf } from "@/lib/pdf-tools";
 import PdfPageWorkspace from "@/components/pdf-page-workspace";
 import AdvancedToolDialog from "@/components/advanced-tool-dialog";
 
@@ -136,7 +136,7 @@ export default function Dashboard() {
     setFiles((current) => current.map((file, index) => index === activeIndex ? next : file));
     setNotice("Changes applied to " + next.name + ". Download when you’re ready.");
   }
-  async function runPdfAction(action: "rotate" | "extract" | "annotate" | "sign" | "merge") {
+  async function runPdfAction(action: "rotate" | "extract" | "annotate" | "sign" | "merge" | "split") {
     if (busy) return;
     if (action !== "merge" && (!activeFile || !isPdf(activeFile))) {
       setNotice("Select a PDF in the workspace first.");
@@ -145,7 +145,13 @@ export default function Dashboard() {
     setBusy(true);
     setNotice("Working locally in your browser…");
     try {
-      if (action === "merge") {
+      if (action === "split" && activeFile) {
+        const results = await splitPdf(activeFile);
+        const resultFiles = results.map((result) => createPdfFile(result.bytes, result.filename));
+        setFiles((current) => [...current, ...resultFiles]);
+        setActiveIndex(files.length);
+        setNotice("Split the document into " + resultFiles.length + " one-page PDFs.");
+      } else if (action === "merge") {
         const merged = await mergePdfs(files);
         const resultFile = createPdfFile(merged.bytes, merged.filename);
         setFiles((current) => [...current, resultFile]);
@@ -342,6 +348,7 @@ export default function Dashboard() {
               <div className="editor-bottom-bar">
                 <span><span className="status-dot" /> {activeFile ? (isPdf(activeFile) ? "PDF ready" : "Preview unavailable") : "Waiting for a file"}</span>
                 <div className="bottom-actions">
+                  {activeTool === "split" && <button onClick={() => runPdfAction("split")} disabled={busy || !activeFile || !isPdf(activeFile)}><Scissors size={14} /> Split into pages</button>}
                   <button onClick={() => runPdfAction("merge")} disabled={busy || pdfFiles.length < 2}><Combine size={14} /> Merge {pdfFiles.length > 0 ? "PDFs (" + pdfFiles.length + ")" : "PDFs"}</button>
                   <div className="range-control"><span>Pages</span><input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="Page range to extract" placeholder="1, 3-5" /><button onClick={() => runPdfAction("extract")} disabled={busy || !activeFile || !isPdf(activeFile)}>Extract</button></div>
                 </div>
