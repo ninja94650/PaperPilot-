@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   const { data: signed, error: signedError } = await supabase.storage.from("paperpilot-documents").createSignedUrl(row.object_path, 300);
   if (signedError || !signed) return NextResponse.json({ error: "Could not create a private document link." }, { status: 500 });
 
-  const origin = new URL(request.url).origin;
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") || new URL(request.url).origin;
   const key = row.id.replace(/-/g, "") + "_" + new Date(row.updated_at).getTime();
   const config: Record<string, unknown> = {
     documentType,
