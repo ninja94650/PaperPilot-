@@ -158,19 +158,21 @@ async function processOne() {
     const scan = await scanWithClamAv(pdf);
     if (!scan.clean) throw new Error("The generated PDF failed malware inspection.");
     await beat(95, "Publishing private output revision");
-    const form = new FormData();
-    form.append("jobId", job.id);
-    form.append("workerId", workerId);
-    form.append("attempt", String(job.attempt));
-    form.append("file", new Blob([pdf], { type: "application/pdf" }), "result.pdf");
-    const response = await fetch(api + "/api/internal/processing/complete", {
-      method: "POST", headers: { Authorization: "Bearer " + token }, body: form,
-      cache: "no-store", signal: AbortSignal.timeout(45_000)
+    const upload = await call("/api/internal/processing/output-upload", {
+      jobId: job.id, workerId, attempt: job.attempt
     });
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.error || "Output publication failed.");
-    }
+    const uploaded = await fetch(upload.signedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/pdf", "x-upsert": "false", "cache-control": "3600" },
+      body: pdf,
+      cache: "no-store",
+      signal: AbortSignal.timeout(90_000)
+    });
+    if (!uploaded.ok) throw new Error("Private output upload failed with status " + uploaded.status + ".");
+    await call("/api/internal/processing/complete", {
+      jobId: job.id, workerId, attempt: job.attempt,
+      storagePath: upload.storagePath, sizeBytes: pdf.byteLength
+    });
   } catch (error) {
     await call("/api/internal/processing/fail", {
       jobId: job.id, workerId, attempt: job.attempt,
