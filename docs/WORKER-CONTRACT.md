@@ -1,33 +1,59 @@
-# PaperPilot LibreOffice worker contract
+# PaperPilot secure processing worker contract
 
-The worker in worker/ implements this contract:
+The queue is PostgreSQL-backed. Supabase is the source of truth; workers poll the authenticated Next.js internal API. No Redis, paid queue, or service-role key is required inside the worker.
 
-- GET /healthz
-- POST /convert
-- Authorization: Bearer <DOCUMENT_WORKER_TOKEN>
-- Multipart file field named file
-- Accept DOC, DOCX, PPT and PPTX only after checking extension and file signature
-- For DOCX/PPTX, validate ZIP central directory structure and bounded expansion metadata before invoking LibreOffice
-- Return PDF bytes beginning with %PDF-
-- Return non-2xx for unsupported, malformed, encrypted, or timed-out inputs
+## User API
 
-OOXML ZIP guardrails:
-- Maximum 1,000 entries
-- Maximum 32 MiB expanded bytes per entry
-- Maximum 128 MiB aggregate expanded bytes
-- Maximum 200:1 per-entry compression ratio
-- Reject ZIP64 and multi-disk archives, encrypted entries, unsupported compression methods, duplicate names, absolute/traversal paths, symlinks, and macro payload entries
-- Require [Content_Types].xml and the appropriate Word or PowerPoint main document part
+| Method | Route | Purpose |
+|---|---|---|
+| POST | /api/processing/jobs | Authenticated, idempotent job creation from a document already in the private library |
+| GET | /api/processing/jobs/{id} | Owner-scoped status and progress-event history |
+| POST | /api/processing/jobs/{id}/cancel | Immediate queued cancellation or cooperative running cancellation |
+| GET | /api/processing/jobs/{id}/download | Short-lived signed download for a published immutable revision |
 
-Security requirements:
-1. Run as a non-root UID in a disposable container.
-2. Disable outbound network egress at the host or platform firewall.
-3. Apply CPU, memory, process, disk and wall-clock limits.
-4. Never interpolate the original filename into a shell command.
-5. Generate server-side random working names; treat filenames as display metadata only.
-6. Delete all job files on success, failure, timeout and cancellation.
-7. Keep the shared bearer token in a secret manager; rotate it if exposed.
-8. Do not log document contents or raw credentials.
-9. Add platform-level rate limits, malware scanning, monitoring and a private network or IP allowlist before public production use.
+All user routes verify the Supabase user. The job and revision/event tables enforce owner-scoped RLS. Authenticated users cannot directly insert, update or delete queue rows; job mutations go through server routes.
 
-The ZIP checks are structural/resource guards, not malware scanning or CDR. Legacy OLE DOC/PPT files do not receive OOXML ZIP-entry checks.
+## Internal worker API
+
+Every internal route requires Authorization: Bearer DOCUMENT_WORKER_TOKEN. Compare tokens in constant time. Never send the Supabase service-role key to a worker.
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | /api/internal/processing/claim-scan | Atomically claim one pending scan with a short lease and signed private input URL |
+| POST | /api/internal/processing/scan-result | Record clean/rejected/failed verdict for the active scan lease |
+| POST | /api/internal/processing/claim | Atomically claim a clean processing job and receive a signed input URL |
+| POST | /api/internal/processing/heartbeat | Renew an active lease, update progress and expose cancellation requests |
+| POST | /api/internal/processing/complete | Validate, store and publish an immutable PDF revision |
+| POST | /api/internal/processing/fail | Record a failure, schedule bounded retry or finalize the job |
+
+## Worker behavior
+
+- Scan pending uploads before processing. ClamAV unavailable, stale/unreadable signature data, or protocol errors must fail closed; never infer a clean verdict.
+- Scan generated PDF output before publishing it.
+- ClamAV runs as a separate container on the private Compose network at TCP port 3310. Do not publish this port: ClamD TCP is unencrypted.
+- The worker claims jobs with Postgres row locking and a bounded lease. Expired leases are reclaimable; exhausted attempts fail closed.
+- Default processing retry budget is 3 attempts with exponential backoff capped at 15 minutes. Scan attempts are capped at 3.
+- Heartbeat renews the lease. Cancellation is cooperative at stage boundaries; hard process termination remains an orchestrator responsibility.
+- Input URLs are short-lived signed URLs. Output keys are random, private, and attempt-specific. The original object is not overwritten.
+- Output revisions are immutable and have per-document monotonically increasing version numbers. Users receive signed download links only after success.
+- Supported queued tool in this increment: DOC/DOCX/PPT/PPTX to PDF. Other tools remain browser-local or unavailable until their worker implementation is added.
+
+## Office validation and limits
+
+- Maximum input: 20 MiB; maximum output: 40 MiB.
+- DOCX/PPTX are validated as ZIP packages before LibreOffice.
+- OOXML bounds: 1,000 entries, 32 MiB per expanded entry, 128 MiB total expanded data, 200:1 maximum per-entry compression ratio.
+- Reject ZIP64/multi-disk archives, encrypted entries, unsupported compression methods, duplicate paths, traversal/absolute paths, symbolic links, macro payloads and missing main document parts.
+- Legacy DOC/PPT files receive OLE signature and size checks only; they do not receive OOXML ZIP-entry checks.
+- LibreOffice runs as non-root in per-job temporary directories and has a 90-second default timeout.
+- Temporary input/output/profile directories are deleted on completion or failure.
+
+## Security boundaries and release gates
+
+1. Keep the worker on a private network or IP allowlist behind HTTPS; add outbound egress restrictions at the host/platform layer.
+2. Enforce host-level rate limits, concurrency quotas, CPU/memory/disk/PID limits and monitoring.
+3. Keep the documents bucket private; never expose raw storage paths or permanent URLs.
+4. The ClamAV signature database must be current; the scanner container has a persistent database volume and needs outbound access to its signature update mirrors. Restrict that egress to the required mirrors at the host firewall.
+5. ClamAV is signature-based and does not guarantee detection of all malware. OOXML structural validation is not content disarm/reconstruction.
+6. Add integration/E2E tests for upload → scan → convert → output scan → immutable revision → download; IDOR, retry, lease recovery, cancellation, cleanup and output tampering must be covered before public launch.
+7. Do not enable public processing until the worker is deployed in a verified isolated environment and all external secrets, Auth URLs, SMTP, retention and operational controls are configured.
