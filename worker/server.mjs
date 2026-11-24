@@ -26,35 +26,6 @@ export function validateFile(file) {
   return extension;
 }
 
-function runLibreOffice(inputPath, outputDir, profileDir) {
-  return new Promise((resolve, reject) => {
-    const child = spawn("libreoffice", [
-      "-env:UserInstallation=file://" + profileDir,
-      "--headless",
-      "--nologo",
-      "--nodefault",
-      "--nolockcheck",
-      "--norestore",
-      "--convert-to", "pdf",
-      "--outdir", outputDir,
-      inputPath
-    ], {
-      cwd: outputDir,
-      env: { ...process.env, HOME: profileDir, TMPDIR: outputDir },
-      stdio: ["ignore", "ignore", "pipe"]
-    });
-    let stderr = "";
-    child.stderr.on("data", (chunk) => { stderr = (stderr + chunk.toString()).slice(-3000); });
-    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
-    child.once("error", (error) => { clearTimeout(timer); reject(error); });
-    child.once("close", (code, signal) => {
-      clearTimeout(timer);
-      if (code === 0) resolve();
-      else reject(new Error(signal === "SIGKILL" ? "LibreOffice conversion timed out." : "LibreOffice could not convert this document. " + stderr.slice(-600)));
-    });
-  });
-}
-
 app.get("/healthz", (_req, res) => res.json({ ok: true, service: "paperpilot-converter" }));
 
 app.post("/convert", (_req, res) => {
