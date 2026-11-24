@@ -6,9 +6,11 @@ create table if not exists public.documents (
   object_path text not null unique,
   mime_type text not null,
   file_size bigint not null check (file_size > 0 and file_size <= 20971520),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
+alter table public.documents add column if not exists updated_at timestamptz not null default now();
 alter table public.documents enable row level security;
 revoke all on public.documents from anon;
 grant select, insert, delete on public.documents to authenticated;
