@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { consumeProcessingRateLimit } from "@/lib/processing/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,15 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 }); }
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
+  try {
+    const limit = await consumeProcessingRateLimit(supabase, "job:create");
+    if (!limit.allowed) return NextResponse.json(
+      { error: "Too many processing requests. Please retry after the rate limit window.", retryAfterSeconds: limit.retryAfterSeconds },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds), "X-RateLimit-Remaining": "0", "Cache-Control": "no-store" } }
+    );
+  } catch {
+    return NextResponse.json({ error: "Processing request protection is temporarily unavailable." }, { status: 503 });
+  }
 
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; }
