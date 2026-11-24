@@ -98,8 +98,9 @@ export function validateOOXMLArchive(buffer, expectedMainPart) {
 
     if (cursor + recordLength > centralEnd || nameLength < 1) fail("A central directory entry has invalid lengths.");
     if (startDisk !== 0) fail("Split archives are not supported.");
-    if ((flags & 0x0001) !== 0) fail("Encrypted Office packages are not supported.");
     if (method !== 0 && method !== 8) fail("An archive entry uses an unsupported compression method.");
+    const allowedFlags = 0x0008 | 0x0800 | (method === 8 ? 0x0006 : 0);
+    if ((flags & ~allowedFlags) !== 0) fail("Encrypted or unsupported ZIP flags are not accepted.");
     if (compressedBytes === 0xffffffff || uncompressedBytes === 0xffffffff || localOffset === 0xffffffff) {
       fail("ZIP64 entry metadata is not supported.");
     }
