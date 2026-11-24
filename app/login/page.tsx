@@ -2,18 +2,17 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
-  const params = useSearchParams();
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState(params.get("error") ? "Your sign-in link could not be verified. Please try again." : "");
+  const [message, setMessage] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setMessage("");
@@ -49,7 +48,7 @@ export default function LoginPage() {
         <label style={labelStyle}>Email address<input style={inputStyle} type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required /></label>
         {mode !== "reset" && <label style={labelStyle}>Password<input style={inputStyle} type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} autoComplete={mode === "signup" ? "new-password" : "current-password"} required /></label>}
         {mode === "signin" && <button type="button" onClick={()=>setMode("reset")} style={{justifySelf:"end",border:0,background:"none",color:"#6957e8",fontWeight:700,cursor:"pointer"}}>Forgot password?</button>}
-        <button disabled={busy} type="submit" style={{border:0,borderRadius:12,padding:"14px 18px",background:"#6957e8",color:"#fff",fontWeight:800,fontSize:14,cursor:busy?"wait":"pointer",opacity:busy?.7:1}}>{busy ? "Please wait…" : mode === "signup" ? "Create account" : mode === "reset" ? "Send reset link" : "Sign in"}</button>
+        <button disabled={busy} type="submit" style={{border:0,borderRadius:12,padding:"14px 18px",background:"#6957e8",color:"#fff",fontWeight:800,fontSize:14,cursor:busy?"wait":"pointer",opacity: busy ? 0.7 : 1}}>{busy ? "Please wait…" : mode === "signup" ? "Create account" : mode === "reset" ? "Send reset link" : "Sign in"}</button>
       </form>
       {message && <p role="status" style={{background:"#f2f0ff",color:"#5545b5",padding:12,borderRadius:10,fontSize:13,lineHeight:1.5,marginTop:16}}>{message}</p>}
       <div style={{borderTop:"1px solid #edf0f5",marginTop:24,paddingTop:20,textAlign:"center",fontSize:13,color:"#737b8d"}}>
