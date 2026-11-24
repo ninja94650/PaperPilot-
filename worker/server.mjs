@@ -1,7 +1,6 @@
 import express from "express";
 import { extname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { timingSafeEqual } from "node:crypto";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
 import { startQueueRunner } from "./queue-runner.mjs";
 
@@ -9,13 +8,6 @@ const app = express();
 const port = Number(process.env.PORT || 8080);
 const token = process.env.DOCUMENT_WORKER_TOKEN || "";
 const maxFileBytes = 20 * 1024 * 1024;
-
-function secureTokenEqual(value) {
-  if (typeof value !== "string") return false;
-  const left = Buffer.from(value);
-  const right = Buffer.from(token);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
 
 export function validateFile(file) {
   const extension = extname(file.originalname).toLowerCase();
