@@ -8,7 +8,8 @@ import {
   RotateCw, ScanText, Scissors, ShieldCheck, Sparkles, WandSparkles, X, Zap,
   Signature, LoaderCircle, Download, Upload, PanelLeftClose, Trash2
 } from "lucide-react";
-import { addTextToPdf, extractPages, mergePdfs, rotatePages } from "@/lib/pdf-tools";
+import { addTextToPdf, extractPages, mergePdfs, rotatePages, splitPdf, optimizePdf, imageToPdf } from "@/lib/pdf-tools";
+import CloudSaveButton from "@/components/cloud-save-button";
 
 type ToolId = "merge" | "split" | "rotate" | "extract" | "annotate" | "sign" | "compress" | "convert" | "ocr";
 type Tool = { id: ToolId; title: string; description: string; icon: typeof FileText; tint: string; ready: boolean; label?: string };
@@ -18,9 +19,9 @@ const accepted = ".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp";
 
 const tools: Tool[] = [
   { id: "merge", title: "Merge PDF", description: "Combine files into one clean document.", icon: Combine, tint: "violet", ready: true },
-  { id: "split", title: "Split PDF", description: "Separate a document into smaller files.", icon: Scissors, tint: "blue", ready: true },
-  { id: "compress", title: "Compress PDF", description: "Reduce file size with quality controls.", icon: FileArchive, tint: "mint", ready: false, label: "Coming soon" },
-  { id: "convert", title: "Convert files", description: "PDF, Word, PowerPoint and images.", icon: FileImage, tint: "orange", ready: false, label: "Coming soon" },
+  { id: "split", title: "Split PDF", description: "Create a separate PDF for each page.", icon: Scissors, tint: "blue", ready: true },
+  { id: "compress", title: "Optimize PDF", description: "Repack PDF structure and measure the result.", icon: FileArchive, tint: "mint", ready: true },
+  { id: "convert", title: "Images to PDF", description: "Convert JPG and PNG images into a PDF.", icon: FileImage, tint: "orange", ready: true },
   { id: "annotate", title: "Edit PDF", description: "Add text notes to your pages.", icon: PenLine, tint: "pink", ready: true },
   { id: "sign", title: "Sign PDF", description: "Place a signature on your document.", icon: Signature, tint: "mint", ready: true },
   { id: "rotate", title: "Rotate PDF", description: "Fix page orientation in a click.", icon: RotateCw, tint: "blue", ready: true },
@@ -133,22 +134,22 @@ export default function Dashboard() {
     setFiles((current) => current.map((file, index) => index === activeIndex ? next : file));
     setNotice("Changes applied to " + next.name + ". Download when you’re ready.");
   }
-  async function runPdfAction(action: "rotate" | "extract" | "annotate" | "sign" | "merge") {
+  async function runPdfAction(action: "rotate" | "extract" | "annotate" | "sign" | "merge" | "split" | "compress" | "convert") {
     if (busy) return;
-    if (action !== "merge" && (!activeFile || !isPdf(activeFile))) {
+    if (action !== "merge" && action !== "convert" && (!activeFile || !isPdf(activeFile))) {
       setNotice("Select a PDF in the workspace first.");
       return;
     }
     setBusy(true);
     setNotice("Working locally in your browser…");
     try {
-      if (action === "merge") {
+      if (action === "convert") {\n        const images = files.filter((file) => /^image\\/(jpeg|png)$/.test(file.type) || /\\.(jpe?g|png)$/i.test(file.name));\n        if (!images.length) throw new Error("Import one or more JPG or PNG images to convert them to PDF.");\n        const result = await imageToPdf(images);\n        const resultFile = createPdfFile(result.bytes, result.filename);\n        setFiles((current) => [...current, resultFile]); setActiveIndex(files.length);\n        setNotice("Converted " + images.length + " image(s) into " + resultFile.name + ".");\n      } else if (action === "merge") {
         const merged = await mergePdfs(files);
         const resultFile = createPdfFile(merged.bytes, merged.filename);
         setFiles((current) => [...current, resultFile]);
         setActiveIndex(files.length);
         setNotice("Merged " + pdfFiles.length + " PDFs into " + resultFile.name + ".");
-      } else if (action === "rotate" && activeFile) {
+      } else if (action === "split" && activeFile) {\n        const results = await splitPdf(activeFile);\n        const splitFiles = results.map((result) => createPdfFile(result.bytes, result.filename));\n        setFiles((current) => [...current, ...splitFiles]); setActiveIndex(files.length);\n        setNotice("Split into " + splitFiles.length + " individual page PDFs.");\n      } else if (action === "compress" && activeFile) {\n        const result = await optimizePdf(activeFile);\n        const resultFile = createPdfFile(result.bytes, result.filename);\n        setFiles((current) => [...current, resultFile]); setActiveIndex(files.length);\n        const delta = activeFile.size - resultFile.size;\n        setNotice(delta > 0 ? "Optimized PDF saved " + formatBytes(delta) + " (" + Math.round(delta / activeFile.size * 100) + "%) smaller." : "PDF structure repacked. This file did not become smaller; image recompression requires a separate engine.");\n      } else if (action === "rotate" && activeFile) {
         const result = await rotatePages(activeFile);
         updateActiveFile(createPdfFile(result.bytes, result.filename));
       } else if (action === "extract" && activeFile) {
@@ -248,7 +249,7 @@ export default function Dashboard() {
             <span className="queue-file-name"><b>{file.name}</b><small>{formatBytes(file.size)} · {isPdf(file) ? "Ready for PDF tools" : "Office/image tools coming soon"}</small></span>
             <button aria-label={"Remove " + file.name} className="icon-button" onClick={() => { setFiles((current) => current.filter((_, i) => i !== index)); setActiveIndex((current) => Math.max(0, current > index ? current - 1 : current === index ? 0 : current)); }}><X size={15} /></button>
           </div>)}</div>
-          <div className="queue-actions"><button className="primary-button compact" onClick={() => openEditor()}>Open PDF workspace <ArrowRight size={16} /></button></div>
+          <div className="queue-actions"><button className="primary-button compact" onClick={() => openEditor()}>Open PDF workspace <ArrowRight size={16} /></button><CloudSaveButton files={files} /></div>
         </div>}
       </section>
 
