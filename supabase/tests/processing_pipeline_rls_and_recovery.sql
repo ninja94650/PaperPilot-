@@ -28,6 +28,10 @@ begin
     (v_doc_a,v_owner_a,'owner-a.docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document',100,v_owner_a::text || '/owner-a.docx','uploaded'),
     (v_doc_b,v_owner_b,'owner-b.docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document',100,v_owner_b::text || '/owner-b.docx','uploaded');
 
+  insert into storage.objects(bucket_id,name)
+  values ('documents',v_owner_a::text || '/owner-a.docx'),
+         ('documents',v_owner_b::text || '/owner-b.docx');
+
   insert into public.processing_jobs (id,owner_id,document_id,tool,status,scan_status,input_storage_path,attempt_count,max_attempts)
   values
     (v_job_a,v_owner_a,v_doc_a,'office-to-pdf','succeeded','clean',v_owner_a::text || '/owner-a.docx',1,3),
@@ -70,12 +74,31 @@ insert into paperpilot_rls_assertions
 select (select count(*)=1 from public.document_revisions where processing_job_id=(select job_a from paperpilot_fixture_ids));
 insert into paperpilot_rls_assertions
 select (select count(*)=0 from public.document_revisions where processing_job_id=(select job_b from paperpilot_fixture_ids));
+insert into paperpilot_rls_assertions
+select (select count(*)=1 from storage.objects where bucket_id='documents' and name like (select owner_a::text || '/%' from paperpilot_fixture_ids));
+insert into paperpilot_rls_assertions
+select (select count(*)=0 from storage.objects where bucket_id='documents' and name like (select owner_b::text || '/%' from paperpilot_fixture_ids));
+do $
+begin
+  begin
+    insert into storage.objects(bucket_id,name)
+    values ('documents',(select owner_b::text || '/forbidden.pdf' from paperpilot_fixture_ids));
+    raise exception 'Storage RLS allowed a cross-tenant upload';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$;
 
 select set_config('request.jwt.claim.sub',(select owner_b::text from paperpilot_fixture_ids),true);
 insert into paperpilot_rls_assertions
 select (select count(*)=1 from public.processing_jobs where id=(select job_b from paperpilot_fixture_ids));
 insert into paperpilot_rls_assertions
 select (select count(*)=0 from public.processing_jobs where id=(select job_a from paperpilot_fixture_ids));
+insert into paperpilot_rls_assertions
+select (select count(*)=1 from storage.objects where bucket_id='documents' and name like (select owner_b::text || '/%' from paperpilot_fixture_ids));
+insert into paperpilot_rls_assertions
+select (select count(*)=0 from storage.objects where bucket_id='documents' and name like (select owner_a::text || '/%' from paperpilot_fixture_ids));
 reset role;
 
 grant insert on paperpilot_claimed_jobs to service_role;
@@ -88,7 +111,7 @@ reset role;
 
 do $$
 begin
-  if (select count(*) from paperpilot_rls_assertions) <> 8 then
+  if (select count(*) from paperpilot_rls_assertions) <> 12 then
     raise exception 'One or more cross-tenant RLS assertions were not executed';
   end if;
   if (select count(*) from paperpilot_claimed_jobs) <> 1
