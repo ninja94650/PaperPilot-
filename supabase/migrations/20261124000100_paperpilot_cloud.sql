@@ -11,6 +11,8 @@ create table if not exists public.documents (
 );
 
 alter table public.documents add column if not exists updated_at timestamptz not null default now();
+create index if not exists documents_user_created_idx on public.documents (user_id, created_at desc);
+
 alter table public.documents enable row level security;
 revoke all on public.documents from anon;
 grant select, insert, delete on public.documents to authenticated;
