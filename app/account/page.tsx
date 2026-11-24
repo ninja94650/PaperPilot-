@@ -7,7 +7,7 @@ export default async function AccountPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   const { data: documents } = await supabase.from("documents").select("id,name,mime_type,size_bytes,status,created_at").order("created_at", { ascending: false }).limit(50);
-  const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, display_name: user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "PaperPilot user" }, { onConflict: "id", ignoreDuplicates: true });
+  await supabase.from("profiles").upsert({ id: user.id, display_name: user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "PaperPilot user" }, { onConflict: "id", ignoreDuplicates: true });
   async function signOut() { "use server"; const client = await createClient(); await client.auth.signOut(); redirect("/"); }
   return <main style={{minHeight:"100vh",background:"#f7f8fc",padding:24,color:"#182033"}}>
     <div style={{maxWidth:1000,margin:"0 auto"}}>
