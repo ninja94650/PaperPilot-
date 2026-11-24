@@ -62,7 +62,9 @@ export async function POST(request: Request) {
   const result = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
   const signature = result.subarray(0, 5).toString("ascii");
   if (signature !== "%PDF-") return NextResponse.json({ error: "The conversion worker response was not a valid PDF." }, { status: 502 });
-  return new NextResponse(result, {
+  const responseBody = new ArrayBuffer(result.byteLength);
+  new Uint8Array(responseBody).set(result);
+  return new NextResponse(responseBody, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
