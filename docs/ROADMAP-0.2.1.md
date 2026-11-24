@@ -45,7 +45,8 @@ Implemented in source:
 
 Remaining:
 - Deploy only on a private/self-hosted environment with verified outbound egress restrictions, HTTPS API boundary, host firewall, rate limits and resource enforcement.
-- Validate image build and end-to-end conversion for DOC, DOCX, PPT and PPTX. Current tests validate archive signatures and conversion cancellation, not complete real Office-to-PDF output for all four formats.
+- CI run #154 built the worker Docker image and generated synthetic DOCX/PPTX plus legacy DOC/PPT fixtures; LibreOffice converted all four to non-empty PDF outputs. This is a format-level smoke test through the actual worker image, not yet the full queue/scanner/storage publication path.
+- Worker Docker image now selects the headless SVP VCL plugin; the conversion test caught and fixed an X11 display dependency.
 - Verify storage cleanup on every failure and cancellation path.
 
 ## Phase 4 — Progress, cancellation and recovery
