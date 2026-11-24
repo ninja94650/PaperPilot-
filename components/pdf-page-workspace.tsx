@@ -43,7 +43,7 @@ export default function PdfPageWorkspace({ file, onChange }: { file: File; onCha
     setDocument(null);
     setError("");
     loadPdfForWorkspace(file).then((loaded) => {
-      if (!alive) { void loaded.destroy(); return; }
+      if (!alive) return;
       setDocument(loaded);
       setOrder(Array.from({ length: loaded.numPages }, (_, index) => index));
       setSelected(0);
