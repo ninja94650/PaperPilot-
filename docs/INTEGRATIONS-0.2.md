@@ -22,14 +22,21 @@ Configure SMTP before relying on production email delivery.
 
 A deployable Docker worker is included in worker/. It accepts authenticated multipart POST /convert requests and returns PDF bytes. The web API requires a signed-in PaperPilot user and proxies the request to this isolated worker.
 
+The worker validates extensions and file signatures, limits input to 20 MB, checks DOCX/PPTX ZIP structure and expansion bounds before conversion, runs LibreOffice as a non-root user in an isolated temporary directory, limits concurrency and conversion time, checks the output PDF signature, and removes job files after each request.
+
+OOXML package bounds:
+- 1,000 entries maximum
+- 32 MiB maximum expanded size per entry
+- 128 MiB maximum aggregate expanded size
+- 200:1 maximum per-entry compression ratio
+- ZIP64, multi-disk, encrypted, duplicate-path, traversal-path, symlink and macro payload entries are rejected
+
+These checks reduce malformed-package and decompression-bomb risk; they are not malware scanning or CDR. Legacy DOC/PPT inputs receive OLE signature and file-size checks only. Do not expose Office conversion publicly until malware/CDR scanning, host-level egress restrictions, private networking, rate limiting and end-to-end security tests are in place.
+
 Set server-only Vercel variables:
 - DOCUMENT_WORKER_URL: public HTTPS base URL of the worker
 - DOCUMENT_WORKER_TOKEN: same long random bearer token configured in the worker
 - NEXT_PUBLIC_APP_URL: canonical PaperPilot origin (also used by ONLYOFFICE callbacks)
-
-The worker validates file extensions and signatures, limits input to 20 MB, runs LibreOffice as a non-root user in an isolated temporary directory, limits concurrency and conversion time, checks the output PDF signature, and removes job files after each request.
-
-Production requirements: keep the worker behind HTTPS and a private network or IP allowlist, restrict outbound network access at the host firewall, monitor resource use, and keep the container patched.
 
 ## ONLYOFFICE Docs
 
