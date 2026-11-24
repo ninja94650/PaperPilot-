@@ -11,7 +11,7 @@ function download(file: File) {
   anchor.href = url;
   anchor.download = file.name;
   anchor.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
