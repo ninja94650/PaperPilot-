@@ -4,20 +4,17 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, extname } from "node:path";
+import { pathToFileURL } from "node:url";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
-const token = process.env.DOCUMENT_WORKER_TOKEN;
+const token = process.env.DOCUMENT_WORKER_TOKEN || "";
 const maxFileBytes = 20 * 1024 * 1024;
 const maxOutputBytes = 40 * 1024 * 1024;
 const maxConcurrentJobs = Number(process.env.MAX_CONCURRENT_JOBS || 2);
 const timeoutMs = Number(process.env.CONVERSION_TIMEOUT_MS || 90_000);
 let activeJobs = 0;
-
-if (!token || token.length < 32) {
-  throw new Error("DOCUMENT_WORKER_TOKEN must be set to a random secret of at least 32 characters.");
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -33,7 +30,7 @@ function secureTokenEqual(value) {
 
 function authorize(req, res, next) {
   const authorization = req.get("authorization") || "";
-  const supplied = authorization.replace(/^Bearer\s+/i, "");
+  const supplied = authorization.replace(/^Bearer\\s+/i, "");
   if (!secureTokenEqual(supplied)) return res.status(401).json({ error: "Unauthorized worker request." });
   next();
 }
@@ -56,7 +53,7 @@ function parseUpload(req, res, next) {
   });
 }
 
-function validateFile(file) {
+export function validateFile(file) {
   const extension = extname(file.originalname).toLowerCase();
   const supported = new Set([".doc", ".docx", ".ppt", ".pptx"]);
   if (!supported.has(extension)) throw new Error("Only DOC, DOCX, PPT and PPTX files are supported.");
@@ -143,6 +140,15 @@ app.use((error, _req, res, _next) => {
   res.status(status).json({ error: status === 413 ? "Files must be 20 MB or smaller." : "The multipart upload is invalid." });
 });
 
-app.listen(port, "0.0.0.0", () => {
-  process.stdout.write("PaperPilot conversion worker listening on " + port + "\n");
-});
+export function startServer() {
+  if (!token || token.length < 32) {
+    throw new Error("DOCUMENT_WORKER_TOKEN must be set to a random secret of at least 32 characters.");
+  }
+  return app.listen(port, "0.0.0.0", () => {
+    process.stdout.write("PaperPilot conversion worker listening on " + port + "\\n");
+  });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  startServer();
+}
