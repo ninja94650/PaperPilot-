@@ -8,9 +8,57 @@ import OnlyOfficeLauncher from "@/components/onlyoffice-launcher";
 type DocumentRow = { id: string; file_name: string; object_path: string; mime_type: string; file_size: number; created_at: string };
 const bucket = "paperpilot-documents";
 
+function detectedMime(file: File) {
+  if (file.type) return file.type;
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  const types: Record<string, string> = {
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ppt: "application/vnd.ms-powerpoint",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp"
+  };
+  return types[extension || ""] || "application/octet-stream";
+}
+
+function uploadWithProgress(file: File, path: string, accessToken: string, onProgress: (value: number) => void) {
+  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!projectUrl || !publishableKey) return Promise.reject(new Error("Supabase is not configured."));
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", projectUrl.replace(/\\/+$/, "") + "/storage/v1/object/" + bucket + "/" + encodedPath);
+    xhr.setRequestHeader("apikey", publishableKey);
+    xhr.setRequestHeader("Authorization", "Bearer " + accessToken);
+    xhr.setRequestHeader("Content-Type", detectedMime(file));
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else {
+        let message = "Cloud upload failed.";
+        try { const payload = JSON.parse(xhr.responseText); message = payload.message || payload.error || message; } catch {}
+        reject(new Error(message));
+      }
+    };
+    xhr.onerror = () => reject(new Error("The cloud storage connection failed."));
+    xhr.ontimeout = () => reject(new Error("Cloud upload timed out. Try again."));
+    xhr.timeout = 120_000;
+    xhr.send(file);
+  });
+}
+
 export default function CloudLibrary({ initialDocuments }: { initialDocuments: DocumentRow[] }) {
   const [documents, setDocuments] = useState(initialDocuments);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
 
   async function upload(file?: File) {
@@ -24,10 +72,13 @@ export default function CloudLibrary({ initialDocuments }: { initialDocuments: D
       if (userError || !user) throw new Error("Your session has expired. Sign in again.");
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120) || "document";
       const path = user.id + "/" + crypto.randomUUID() + "/" + safeName;
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, { upsert: false, contentType: file.type || "application/octet-stream" });
-      if (uploadError) throw uploadError;
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) throw new Error("Your session has expired. Sign in again.");
+      setProgress(0);
+      await uploadWithProgress(file, path, sessionData.session.access_token, setProgress);
+      const mimeType = detectedMime(file);
       const { data, error: insertError } = await supabase.from("documents").insert({
-        user_id: user.id, file_name: file.name, object_path: path, mime_type: file.type || "application/octet-stream", file_size: file.size
+        user_id: user.id, file_name: file.name, object_path: path, mime_type: mimeType, file_size: file.size
       }).select("id,file_name,object_path,mime_type,file_size,created_at").single();
       if (insertError) {
         await supabase.storage.from(bucket).remove([path]);
@@ -37,7 +88,7 @@ export default function CloudLibrary({ initialDocuments }: { initialDocuments: D
       setNotice("Uploaded securely to your private library.");
     } catch (reason) {
       setNotice(reason instanceof Error ? reason.message : "Upload failed.");
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setProgress(null); }
   }
 
   async function download(row: DocumentRow) {
@@ -68,7 +119,8 @@ export default function CloudLibrary({ initialDocuments }: { initialDocuments: D
   return <section className="cloud-library">
     <div className="cloud-library-head"><div><h2>Cloud library</h2><p>Private files saved to your account. 20 MB per file.</p></div><label className="cloud-upload-button"><CloudUpload size={16} /> Upload files<input type="file" multiple hidden onChange={async (event) => { const selected = Array.from(event.target.files ?? []); event.target.value = ""; for (const file of selected) await upload(file); }} /></label></div>
     {notice && <p className="cloud-notice" role="status">{notice}</p>}
-    {busy && <p className="cloud-busy"><LoaderCircle className="spin" size={14} /> Working securely…</p>}
+    {busy && <p className="cloud-busy"><LoaderCircle className="spin" size={14} /> {progress === null ? "Working securely…" : "Uploading " + progress + "%"}</p>}
+    {progress !== null && <div className="cloud-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><span style={{ width: progress + "%" }} /></div>}
     {!documents.length ? <div className="cloud-empty"><FileText size={25} /><b>Your library is ready</b><p>Upload a document to keep it in your private cloud history.</p></div> : <div className="cloud-documents">{documents.map((row) => <article key={row.id} className="cloud-document"><span className="cloud-file-icon"><FileText size={19} /></span><span className="cloud-file-meta"><b>{row.file_name}</b><small>{(row.file_size / 1024 / 1024).toFixed(2)} MB · {new Date(row.created_at).toLocaleDateString()}</small></span><button title="Download" disabled={busy} onClick={() => void download(row)}><ArrowDownToLine size={16} /></button><button title="Delete" disabled={busy} onClick={() => void remove(row)}><Trash2 size={16} /></button>{/\.(docx?|pptx?)$/i.test(row.file_name) && <OnlyOfficeLauncher documentId={row.id} />}</article>)}</div>}
   </section>;
 }
