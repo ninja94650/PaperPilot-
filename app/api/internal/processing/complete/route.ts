@@ -48,6 +48,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "The uploaded private PDF object could not be verified." }, { status: 409 });
   }
 
+  const { data: signedOutput, error: signedOutputError } = await admin.storage.from("documents").createSignedUrl(storagePath, 60);
+  if (signedOutputError || !signedOutput?.signedUrl) {
+    return NextResponse.json({ error: "Could not verify the stored PDF signature." }, { status: 502 });
+  }
+  const signatureResponse = await fetch(signedOutput.signedUrl, {
+    headers: { Range: "bytes=0-4" }, cache: "no-store", signal: AbortSignal.timeout(10_000)
+  }).catch(() => null);
+  if (!signatureResponse?.ok || !signatureResponse.body) {
+    await admin.storage.from("documents").remove([storagePath]);
+    return NextResponse.json({ error: "The uploaded PDF could not be read for validation." }, { status: 415 });
+  }
+  const reader = signatureResponse.body.getReader();
+  const firstChunk = await reader.read().catch(() => ({ done: true, value: undefined }));
+  await reader.cancel().catch(() => {});
+  if (!firstChunk.value || Buffer.from(firstChunk.value).subarray(0, 5).toString("ascii") !== "%PDF-") {
+    await admin.storage.from("documents").remove([storagePath]);
+    return NextResponse.json({ error: "The uploaded object does not have a PDF file signature." }, { status: 415 });
+  }
+
   const { data: document, error: documentError } = await admin.from("documents")
     .select("id,owner_id").eq("id", job.document_id).eq("owner_id", job.owner_id).maybeSingle();
   if (documentError || !document) return NextResponse.json({ error: "Source document ownership could not be verified." }, { status: 404 });
