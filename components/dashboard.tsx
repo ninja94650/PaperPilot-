@@ -307,7 +307,7 @@ export default function Dashboard() {
               <div className="editor-toolbar">
                 <div className="editor-document-title"><FileText size={16} /><span>{activeFile?.name ?? "No file selected"}</span></div>
                 <div className="editor-actions">
-                  <button onClick={() => runPdfAction("rotate")} disabled={busy || !activeFile || !isPdf(activeFile)}><RotateCw size={15} /><span>Rotate</span></button>
+                  <button onClick={() => runPdfAction("rotate")} disabled={busy || !activeFile || !isPdf(activeFile)}><RotateCw size={15} /><span>Rotate</span></button><button onClick={() => runPdfAction("split")} disabled={busy || !activeFile || !isPdf(activeFile)}><Scissors size={15} /><span>Split</span></button><button onClick={() => runPdfAction("compress")} disabled={busy || !activeFile || !isPdf(activeFile)}><FileArchive size={15} /><span>Optimize</span></button><button onClick={() => runPdfAction("convert")} disabled={busy || !files.some((file) => /^image\\/(jpeg|png)$/.test(file.type) || /\\.(jpe?g|png)$/i.test(file.name))}><FileImage size={15} /><span>Images to PDF</span></button>
                   <button onClick={() => setShowTextPanel("annotate")} disabled={busy || !activeFile || !isPdf(activeFile)}><PenLine size={15} /><span>Text note</span></button>
                   <button onClick={() => setShowTextPanel("sign")} disabled={busy || !activeFile || !isPdf(activeFile)}><Signature size={15} /><span>Sign</span></button>
                   <button className="download-action" onClick={() => activeFile && makeDownload(activeFile)} disabled={!activeFile}><Download size={15} /><span>Download</span></button>
