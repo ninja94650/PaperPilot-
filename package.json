@@ -15,7 +15,9 @@
     "next": "15.5.29",
     "pdf-lib": "^1.17.1",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "pdfjs-dist": "6.5.438",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
