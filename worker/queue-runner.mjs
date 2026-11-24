@@ -63,7 +63,7 @@ function validateOffice(buffer, name) {
   return extension;
 }
 
-function convert(buffer, name, extension, signal) {
+export function convert(buffer, name, extension, signal) {
   return new Promise(async (resolve, reject) => {
     let dir;
     let child;
