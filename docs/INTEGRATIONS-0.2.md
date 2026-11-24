@@ -27,7 +27,7 @@ The flow is:
 2. The server verifies ownership and creates an idempotent processing job in queued / scan_status=pending.
 3. A separate scan lease is claimed through the internal worker API. ClamAV scans the input; only a clean verdict permits conversion.
 4. The conversion worker claims a clean job, downloads a short-lived signed URL, validates the Office extension/signature and OOXML archive bounds, and runs LibreOffice in a per-job temporary profile.
-5. The output PDF is scanned again. A clean result is uploaded under a random private key and published as an immutable document revision.
+5. The output PDF is scanned again. A clean result is uploaded directly to private Supabase Storage through a one-object signed upload URL scoped to the active attempt, then verified and published as an immutable document revision. Large PDF bytes do not pass through Vercel.
 6. Users can poll owner-scoped status/events, request cancellation, and download a completed revision using a 60-second signed URL.
 
 The worker has no Supabase service-role key. It authenticates to internal endpoints with DOCUMENT_WORKER_TOKEN. The web deployment needs these server-only variables:
