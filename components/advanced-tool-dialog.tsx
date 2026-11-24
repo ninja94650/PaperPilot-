@@ -76,13 +76,20 @@ export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) throw new Error("Sign in before using secure Office conversion.");
         const safeName = officeFile.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "document.docx";
+        const extension = officeFile.name.split(".").pop()?.toLowerCase();
+        const officeMime: Record<string, string> = {
+          doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        };
+        const mimeType = officeMime[extension || ""];
+        if (!mimeType) throw new Error("Unsupported Office file type.");
         const storagePath = user.id + "/" + crypto.randomUUID() + "/" + safeName;
         const { error: uploadError } = await supabase.storage.from("documents").upload(storagePath, officeFile, {
-          upsert: false, contentType: officeFile.type || "application/octet-stream"
+          upsert: false, contentType: mimeType
         });
         if (uploadError) throw new Error("Private upload failed: " + uploadError.message);
         const { data: document, error: documentError } = await supabase.from("documents").insert({
-          owner_id: user.id, name: safeName, mime_type: officeFile.type || "application/octet-stream",
+          owner_id: user.id, name: safeName, mime_type: mimeType,
           size_bytes: officeFile.size, storage_path: storagePath, status: "uploaded"
         }).select("id").single();
         if (documentError || !document) {
