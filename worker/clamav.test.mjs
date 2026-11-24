@@ -53,7 +53,7 @@ test("ClamAV reports a clean streamed document with scanner version", async () =
 
 test("ClamAV reports an infected document as rejected, not clean", async () => {
   await withClamAv("stream: Eicar-Test-Signature FOUND", async (endpoint) => {
-    const eicar = "X5O!P%@AP[4\\\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
+    const eicar = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
     const result = await scanWithClamAv(Buffer.from(eicar, "ascii"), endpoint);
     assert.equal(result.clean, false);
     assert.match(result.threat, /FOUND/);
