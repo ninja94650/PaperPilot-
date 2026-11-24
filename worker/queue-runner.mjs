@@ -94,6 +94,7 @@ export function convert(buffer, name, extension, signal) {
       const inputPath = join(inputDir, base + extension);
       const outputPath = join(outputDir, base + ".pdf");
       await writeFile(inputPath, buffer, { flag: "wx", mode: 0o600 });
+      if (signal?.aborted) return onAbort();
       child = spawn("libreoffice", [
         "-env:UserInstallation=file://" + profileDir, "--headless", "--nologo",
         "--nodefault", "--nolockcheck", "--norestore", "--convert-to", "pdf",
