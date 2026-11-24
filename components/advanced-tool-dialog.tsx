@@ -53,8 +53,10 @@ export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
         results.forEach((item) => download(item));
         setMessage(results.length + " page image(s) exported.");
       } else {
+        const officeFile = office[0];
+        if (!officeFile) throw new Error("Choose a DOC, DOCX, PPT or PPTX file.");
         const data = new FormData();
-        data.append("file", file);
+        data.append("file", officeFile);
         const response = await fetch("/api/convert", { method: "POST", body: data });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "Office conversion is unavailable.");
