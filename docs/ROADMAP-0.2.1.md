@@ -55,7 +55,7 @@ Implemented in source:
 - Owner-scoped status/event endpoint and polling UI.
 - Worker heartbeats extend leases and report progress.
 - Queued cancellation is immediate; running cancellation is cooperative at worker stage boundaries.
-- Worker now asks the internal API to remove prior-attempt output objects after a retry claim and periodically sweeps private outputs belonging to queued, failed, cancelled or long-expired jobs. Cleanup validates the exact owner/job/attempt path, preserves active current-attempt outputs, and applies a five-minute grace to expired leases. The worker logs aggregate cleanup counts without exposing storage paths.
+- Worker now asks the internal API to remove prior-attempt output objects after a retry claim and periodically sweeps private outputs belonging to queued, failed, cancelled or long-expired jobs. Cleanup validates the exact owner/job/attempt path, preserves active current-attempt outputs, and applies a five-minute grace to expired leases. The worker logs aggregate cleanup counts without exposing storage paths. Claim/failure handlers now retain the DB path reference if object deletion fails, allowing the periodic sweeper to retry instead of losing track of an orphan.
 - Worker failure API records retry/final failure; lease expiry permits recovery.
 - Download endpoint only issues short-lived links for completed immutable revisions.
 
