@@ -32,7 +32,7 @@ function uploadWithProgress(file: File, path: string, accessToken: string, onPro
   const encodedPath = path.split("/").map(encodeURIComponent).join("/");
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", projectUrl.replace(/\\/+$/, "") + "/storage/v1/object/" + bucket + "/" + encodedPath);
+    xhr.open("POST", projectUrl.replace(/\/+$/, "") + "/storage/v1/object/" + bucket + "/" + encodedPath);
     xhr.setRequestHeader("apikey", publishableKey);
     xhr.setRequestHeader("Authorization", "Bearer " + accessToken);
     xhr.setRequestHeader("Content-Type", detectedMime(file));
