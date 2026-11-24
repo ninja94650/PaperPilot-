@@ -1,6 +1,6 @@
 -- Cross-tenant RLS and expired processing lease recovery regression tests.
 -- Run only against a disposable Supabase database with auth/schema privileges.
--- All fixture rows are rolled back.
+-- All fixture rows are rolled back; sequence advancement is harmless.
 begin;
 
 create temporary table paperpilot_rls_assertions(ok boolean not null check (ok));
@@ -44,12 +44,11 @@ begin
     (v_owner_a,v_doc_a,v_job_a,1,v_owner_a::text || '/' || v_job_a::text || '/attempt-1/result.pdf','application/pdf',100),
     (v_owner_b,v_doc_b,v_job_b,1,v_owner_b::text || '/' || v_job_b::text || '/attempt-1/result.pdf','application/pdf',100);
 
-  insert into public.processing_job_events(job_id,owner_id,event_type,status,progress_percent,message)
+  insert into public.processing_job_events(id,job_id,owner_id,event_type,status,progress_percent,message)
   values
-    (v_job_a,v_owner_a,'created','succeeded',100,'owner A event'),
-    (v_job_b,v_owner_b,'created','succeeded',100,'owner B event');
+    (nextval('public.processing_job_events_id_seq'),v_job_a,v_owner_a,'created','succeeded',100,'owner A event'),
+    (nextval('public.processing_job_events_id_seq'),v_job_b,v_owner_b,'created','succeeded',100,'owner B event');
 
-  -- Persist IDs for assertions without exposing test fixtures outside this transaction.
   create temporary table paperpilot_fixture_ids(owner_a uuid,owner_b uuid,job_a uuid,job_b uuid,recovery_job uuid);
   insert into paperpilot_fixture_ids values(v_owner_a,v_owner_b,v_job_a,v_job_b,v_recovery_job);
 end;
@@ -79,8 +78,6 @@ insert into paperpilot_rls_assertions
 select (select count(*)=0 from public.processing_jobs where id=(select job_a from paperpilot_fixture_ids));
 reset role;
 
--- Only the service role can claim a lease. The expired job must be reclaimed
--- with a fresh worker ID and a monotonically incremented attempt count.
 grant insert on paperpilot_claimed_jobs to service_role;
 set local role service_role;
 insert into paperpilot_claimed_jobs
