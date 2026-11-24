@@ -71,6 +71,7 @@ export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
       } else {
         const officeFile = office[0];
         if (!officeFile) throw new Error("Choose a DOC, DOCX, PPT or PPTX file.");
+        if (officeFile.size > 20 * 1024 * 1024) throw new Error("Office inputs must be 20 MB or smaller.");
         setProgress("Uploading to private storage…");
         const supabase = createSupabaseClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
