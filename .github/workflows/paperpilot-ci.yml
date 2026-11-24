@@ -7,7 +7,11 @@ on:
     branches: [main, "feature/paperpilot-0.2-advanced-workspace"]
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: paperpilot-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -22,10 +26,26 @@ jobs:
           node-version: "22.13.1"
       - name: Install dependencies
         run: npm install
+      - name: Install worker dependencies
+        run: npm install --prefix worker
+      - name: Commit generated lockfiles
+        if: github.event_name == 'push' && github.ref_name == 'feature/paperpilot-0.2-advanced-workspace'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json worker/package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: add reproducible npm lockfiles [skip ci]"
+          git push origin HEAD:"$GITHUB_REF_NAME"
       - name: Report dependency advisories
         run: |
           npm audit --json > npm-audit.json || true
           node -e 'const a=require("./npm-audit.json"); for (const [name,v] of Object.entries(a.vulnerabilities||{})) console.log(v.severity.toUpperCase()+" "+name+": direct="+v.isDirect+"; range="+v.range+"; fix="+JSON.stringify(v.fixAvailable)); console.log("Audit totals:", JSON.stringify(a.metadata?.vulnerabilities||{}));'
+      - name: Report worker dependency advisories
+        working-directory: worker
+        run: |
+          npm audit --json > ../worker-audit.json || true
+          node -e 'const a=require("../worker-audit.json"); for (const [name,v] of Object.entries(a.vulnerabilities||{})) console.log(v.severity.toUpperCase()+" "+name+": range="+v.range); console.log("Worker audit totals:", JSON.stringify(a.metadata?.vulnerabilities||{}));'
       - name: Type check
         run: npm run typecheck
       - name: Production build
