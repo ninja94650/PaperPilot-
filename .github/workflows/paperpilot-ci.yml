@@ -130,3 +130,62 @@ jobs:
           NODE
       - name: Run live EICAR detection and clean-PDF scanner tests
         run: npm --prefix worker test
+
+  office-conversion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Build the isolated LibreOffice worker image
+        run: docker build --tag paperpilot-worker-ci ./worker
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install open-source Office fixture generators
+        run: |
+          python -m venv "$RUNNER_TEMP/paperpilot-venv"
+          "$RUNNER_TEMP/paperpilot-venv/bin/pip" install --disable-pip-version-check python-docx==1.1.2 python-pptx==1.0.2
+      - name: Generate synthetic DOCX and PPTX inputs
+        run: |
+          mkdir -p "$RUNNER_TEMP/paperpilot-office/input" "$RUNNER_TEMP/paperpilot-office/legacy" "$RUNNER_TEMP/paperpilot-office/output"
+          "$RUNNER_TEMP/paperpilot-venv/bin/python" <<'PY'
+          from docx import Document
+          from pptx import Presentation
+          from pptx.util import Inches
+          from pathlib import Path
+          root = Path(__import__("os").environ["RUNNER_TEMP"]) / "paperpilot-office" / "input"
+          doc = Document()
+          doc.add_heading("PaperPilot synthetic conversion fixture", level=1)
+          doc.add_paragraph("Synthetic DOCX input for isolated LibreOffice conversion testing.")
+          doc.save(root / "sample.docx")
+          presentation = Presentation()
+          slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+          box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(2))
+          box.text = "PaperPilot synthetic PPTX conversion fixture"
+          presentation.save(root / "sample.pptx")
+          PY
+      - name: Create legacy DOC and PPT fixtures
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/paperpilot-office:/fixtures" --entrypoint soffice paperpilot-worker-ci --headless -env:UserInstallation=file:///tmp/lo-legacy-doc --convert-to doc --outdir /fixtures/legacy /fixtures/input/sample.docx
+          docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/paperpilot-office:/fixtures" --entrypoint soffice paperpilot-worker-ci --headless -env:UserInstallation=file:///tmp/lo-legacy-ppt --convert-to ppt --outdir /fixtures/legacy /fixtures/input/sample.pptx
+      - name: Convert all four Office formats to PDF
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/paperpilot-office:/fixtures" --entrypoint soffice paperpilot-worker-ci --headless -env:UserInstallation=file:///tmp/lo-to-pdf --convert-to pdf --outdir /fixtures/output /fixtures/input/sample.docx /fixtures/input/sample.pptx /fixtures/legacy/sample.doc /fixtures/legacy/sample.ppt
+      - name: Verify real PDF outputs for DOC, DOCX, PPT and PPTX
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ["RUNNER_TEMP"]) / "paperpilot-office"
+          expected = ["sample.pdf"]
+          outputs = list((root / "output").glob("*.pdf"))
+          assert len(outputs) == 4, f"expected 4 PDFs, found {[p.name for p in outputs]}"
+          for path in outputs:
+              data = path.read_bytes()
+              assert data.startswith(b"%PDF-"), f"{path.name} is not a PDF"
+              assert len(data) > 500, f"{path.name} is unexpectedly small"
+          assert {p.name for p in outputs} == {"sample.pdf", "sample 1.pdf", "sample 2.pdf", "sample 3.pdf"}, [p.name for p in outputs]
+          print("Validated four non-empty PDF outputs from DOC, DOCX, PPT and PPTX fixtures.")
+          PY
