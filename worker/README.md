@@ -34,7 +34,8 @@ The worker uses the same bearer token for its internal API calls. Keep it secret
 
 ## Limits and validation
 
-- Input maximum: 20 MiB; output maximum: 40 MiB.
+- Input maximum: 20 MiB; output maximum: 40 MiB. The private documents bucket is configured for 40 MiB objects to allow generated PDFs; the job API and worker independently enforce the smaller input cap.
+- Supabase signed upload URLs are valid for 2 hours and single-use for the exact object path; each processing attempt uses a distinct immutable output key.
 - OOXML archive bounds: 1,000 entries, 32 MiB per expanded entry, 128 MiB total expanded data, and 200:1 maximum per-entry compression ratio.
 - Reject ZIP64/multi-disk archives, encrypted entries, unsupported compression methods, duplicate or traversal paths, symbolic links, macro payloads and missing main document parts.
 - Legacy DOC/PPT files receive OLE signature and size checks; they do not receive the OOXML ZIP checks.
