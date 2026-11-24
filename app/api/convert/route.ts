@@ -13,8 +13,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DOCX/PPTX conversion is not connected yet. Configure the isolated LibreOffice worker in the deployment environment." }, { status: 503 });
   }
 
-  const supabase = await createClient().catch(() => null);
-  if (!supabase) return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 });
+  const maybeSupabase = await createClient().catch(() => null);
+  if (!maybeSupabase) return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 });
+  const supabase = maybeSupabase;
   const { data: userData, error: authError } = await supabase.auth.getUser();
   const user = userData.user;
   if (authError || !user) return NextResponse.json({ error: "Sign in is required for Office conversion." }, { status: 401 });
