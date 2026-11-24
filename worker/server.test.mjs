@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { deflateRawSync } from "node:zlib";
 import { validateFile } from "./server.mjs";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
 
@@ -19,21 +20,22 @@ function makeZip(entries) {
   const localParts = [];
   const centralParts = [];
   let localOffset = 0;
-  for (const [name, contentValue] of entries) {
+  for (const [name, contentValue, method = 0] of entries) {
     const nameBytes = Buffer.from(name, "utf8");
     const content = Buffer.from(contentValue);
+    const compressed = method === 8 ? deflateRawSync(content) : content;
     const crc = crc32(content);
-    const local = Buffer.alloc(30 + nameBytes.length + content.length);
+    const local = Buffer.alloc(30 + nameBytes.length + compressed.length);
     local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(20, 4);
     local.writeUInt16LE(0x0800, 6);
-    local.writeUInt16LE(0, 8);
+    local.writeUInt16LE(method, 8);
     local.writeUInt32LE(crc, 14);
-    local.writeUInt32LE(content.length, 18);
+    local.writeUInt32LE(compressed.length, 18);
     local.writeUInt32LE(content.length, 22);
     local.writeUInt16LE(nameBytes.length, 26);
     nameBytes.copy(local, 30);
-    content.copy(local, 30 + nameBytes.length);
+    compressed.copy(local, 30 + nameBytes.length);
     localParts.push(local);
 
     const central = Buffer.alloc(46 + nameBytes.length);
@@ -41,9 +43,9 @@ function makeZip(entries) {
     central.writeUInt16LE(20, 4);
     central.writeUInt16LE(20, 6);
     central.writeUInt16LE(0x0800, 8);
-    central.writeUInt16LE(0, 10);
+    central.writeUInt16LE(method, 10);
     central.writeUInt32LE(crc, 16);
-    central.writeUInt32LE(content.length, 20);
+    central.writeUInt32LE(compressed.length, 20);
     central.writeUInt32LE(content.length, 24);
     central.writeUInt16LE(nameBytes.length, 28);
     central.writeUInt32LE(0, 38);
@@ -118,4 +120,16 @@ test("rejects packages missing the expected document part", () => {
 test("rejects packages that exceed the entry count limit", () => {
   const many = Array.from({ length: 1_001 }, (_, index) => ["custom/" + index + ".xml", "x"]);
   assert.throws(() => validateOOXMLArchive(makeZip([...docxEntries, ...many]), "word/document.xml"), /too many entries/i);
+});
+
+test("rejects extreme ZIP compression ratios", () => {
+  const archive = makeZip([...docxEntries, ["word/large.xml", "A".repeat(20_000), 8]]);
+  assert.throws(() => validateOOXMLArchive(archive, "word/document.xml"), /compression-ratio/i);
+});
+
+test("rejects ZIP64 directory metadata", () => {
+  const archive = makeZip(docxEntries);
+  const endOffset = archive.length - 22;
+  archive.writeUInt16LE(0xffff, endOffset + 10);
+  assert.throws(() => validateOOXMLArchive(archive, "word/document.xml"), /ZIP64/i);
 });
