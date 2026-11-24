@@ -197,7 +197,7 @@ export default function Dashboard() {
           <a href="#roadmap" onClick={() => setMobileMenu(false)}>Roadmap</a>
         </nav>
         <div className="header-actions">
-          <button className="text-button" onClick={() => setNotice("Accounts and cloud workspaces are planned for a future release.")}>Sign in</button>
+          <a className="text-button" href="/login">Sign in</a>
           <button className="header-cta" onClick={() => document.getElementById("upload-zone")?.scrollIntoView({ behavior: "smooth" })}>Get started <ArrowUpRight size={15} /></button>
         </div>
         <button className="mobile-menu-button" aria-label="Toggle navigation" onClick={() => setMobileMenu((value) => !value)}>{mobileMenu ? <X size={21} /> : <Menu size={21} />}</button>
