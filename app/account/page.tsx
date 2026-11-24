@@ -7,12 +7,8 @@ import CloudLibrary from "@/components/cloud-library";
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
-  let supabase;
-  try {
-    supabase = await createClient();
-  } catch {
-    redirect("/login?setup=1");
-  }
+  const supabase = await createClient().catch(() => null);
+  if (!supabase) redirect("/login?setup=1");
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) redirect("/login");
   const { data: documents, error: documentsError } = await supabase
