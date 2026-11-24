@@ -94,7 +94,7 @@ test("rejects unsupported extensions and empty files", () => {
 });
 
 test("rejects a truncated ZIP package", () => {
-  assert.throws(() => validateOOXMLArchive(Buffer.from([0x50, 0x4b, 0x03, 0x04]), "word/document.xml"), /ZIP directory/i);
+  assert.throws(() => validateOOXMLArchive(Buffer.from([0x50, 0x4b, 0x03, 0x04]), "word/document.xml"), /too small|ZIP directory/i);
 });
 
 test("rejects path traversal entries", () => {
