@@ -28,12 +28,24 @@ export async function POST(request: NextRequest) {
     .select("id,owner_id,document_id,status,worker_id,lease_expires_at,attempt_count,output_storage_path")
     .eq("id", jobId).maybeSingle();
   if (jobError) return NextResponse.json({ error: "Could not verify the processing job." }, { status: 500 });
-  if (!job || job.status !== "running" || job.worker_id !== workerId || job.attempt_count !== attempt
+  if (!job) return NextResponse.json({ error: "Processing job not found." }, { status: 404 });
+
+  // A retry after a lost HTTP response returns the already-published revision.
+  if (job.status === "succeeded" && job.output_storage_path === storagePath) {
+    const { data: existing, error: existingError } = await admin.from("document_revisions")
+      .select("id,version").eq("processing_job_id", job.id).maybeSingle();
+    if (existingError || !existing) return NextResponse.json({ error: "The published revision could not be recovered." }, { status: 500 });
+    return NextResponse.json({ ok: true, revisionId: existing.id, version: existing.version, reused: true }, {
+      headers: { "Cache-Control": "no-store" }
+    });
+  }
+
+  if (job.status !== "running" || job.worker_id !== workerId || job.attempt_count !== attempt
     || !job.lease_expires_at || new Date(job.lease_expires_at).getTime() <= Date.now()) {
     return NextResponse.json({ error: "The worker lease is no longer valid." }, { status: 409 });
   }
-  if (!job.document_id || job.output_storage_path !== storagePath || !storagePath.startsWith(job.owner_id + "/" + job.id + "/")
-    || !new RegExp("^" + job.owner_id + "/" + job.id + "/attempt-" + attempt + "/result\\.pdf$").test(storagePath)) {
+  if (!job.document_id || job.output_storage_path !== storagePath
+    || storagePath !== job.owner_id + "/" + job.id + "/attempt-" + attempt + "/result.pdf") {
     return NextResponse.json({ error: "The output path is not scoped to this job and owner." }, { status: 403 });
   }
 
@@ -68,51 +80,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "The uploaded object does not have a PDF file signature." }, { status: 415 });
   }
 
-  const { data: document, error: documentError } = await admin.from("documents")
-    .select("id,owner_id").eq("id", job.document_id).eq("owner_id", job.owner_id).maybeSingle();
-  if (documentError || !document) return NextResponse.json({ error: "Source document ownership could not be verified." }, { status: 404 });
-  const { data: latest } = await admin.from("document_revisions").select("version")
-    .eq("document_id", document.id).order("version", { ascending: false }).limit(1).maybeSingle();
-  const version = (latest?.version ?? 0) + 1;
-
-  const { data: revision, error: revisionError } = await admin.from("document_revisions").insert({
-    owner_id: job.owner_id, document_id: document.id, processing_job_id: job.id,
-    version, storage_path: storagePath, mime_type: "application/pdf", size_bytes: sizeBytes
-  }).select("id,version").single();
-  if (revisionError || !revision) {
-    await admin.storage.from("documents").remove([storagePath]);
-    return NextResponse.json({ error: "Could not publish the immutable output revision." }, { status: 500 });
-  }
-
-  const { error: pathError } = await admin.from("processing_jobs").update({
-    output_storage_path: storagePath,
-    output_metadata: { mime_type: "application/pdf", output_size_bytes: sizeBytes, revision_id: revision.id, revision: version }
-  }).eq("id", job.id).eq("status", "running").eq("worker_id", workerId);
-  if (pathError) {
-    await admin.from("document_revisions").delete().eq("id", revision.id);
-    await admin.storage.from("documents").remove([storagePath]);
-    return NextResponse.json({ error: "Could not attach the output to its processing job." }, { status: 409 });
-  }
-
-  const { data: finished, error: finishError } = await admin.rpc("finish_processing_job", {
-    p_job_id: job.id, p_worker_id: workerId, p_success: true,
-    p_error_code: null, p_error_message: null
+  const { data: published, error: publishError } = await admin.rpc("publish_processing_revision", {
+    p_job_id: job.id,
+    p_worker_id: workerId,
+    p_attempt: attempt,
+    p_storage_path: storagePath,
+    p_size_bytes: sizeBytes
   });
-  const finalJob = Array.isArray(finished) ? finished[0] : finished;
-  if (finishError || !finalJob || finalJob.status !== "succeeded") {
-    await admin.from("document_revisions").delete().eq("id", revision.id);
-    await admin.storage.from("documents").remove([storagePath]);
-    await admin.from("processing_jobs").update({ output_storage_path: null, output_metadata: {} }).eq("id", job.id);
-    return NextResponse.json({ error: "The job could not be finalized; its temporary output was discarded." }, { status: 409 });
+  const revision = Array.isArray(published) ? published[0] : published;
+  if (publishError || !revision) {
+    return NextResponse.json({ error: "The output could not be atomically published. The private object was retained for safe retry or cleanup." }, { status: 409 });
   }
-
-  await admin.from("documents").update({ status: "ready", updated_at: new Date().toISOString() })
-    .eq("id", document.id).eq("owner_id", job.owner_id);
-  await admin.from("processing_job_events").insert({
-    job_id: job.id, owner_id: job.owner_id, event_type: "completed",
-    status: "succeeded", progress_percent: 100, message: "Output revision " + version + " published"
-  });
-  return NextResponse.json({ ok: true, revisionId: revision.id, version }, {
+  return NextResponse.json({ ok: true, revisionId: revision.revision_id, version: revision.revision_version, reused: false }, {
     headers: { "Cache-Control": "no-store" }
   });
 }
