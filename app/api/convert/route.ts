@@ -26,7 +26,9 @@ export async function POST(request: Request) {
 
   const body = new FormData();
   body.append("file", file, file.name);
-  const target = new URL("/convert", workerUrl);
+  let target: URL;
+  try { target = new URL("/convert", workerUrl); }
+  catch { return NextResponse.json({ error: "The document worker URL is invalid." }, { status: 500 }); }
   let response: Response;
   try {
     response = await fetch(target, {
@@ -40,9 +42,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "The document worker did not respond. Try again later." }, { status: 502 });
   }
   if (!response.ok) return NextResponse.json({ error: "The document worker could not convert this file (status " + response.status + ")." }, { status: 502 });
-  const result = await response.arrayBuffer();
-  if (result.byteLength < 5 || result.byteLength > 40 * 1024 * 1024) return NextResponse.json({ error: "The conversion worker returned an invalid file size." }, { status: 502 });
-  const signature = new TextDecoder().decode(result.slice(0, 5));
+  const declaredSize = Number(response.headers.get("content-length") || 0);
+  if (declaredSize > 40 * 1024 * 1024) return NextResponse.json({ error: "The conversion worker returned an oversized file." }, { status: 502 });
+  const reader = response.body?.getReader();
+  if (!reader) return NextResponse.json({ error: "The conversion worker returned an empty response." }, { status: 502 });
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > 40 * 1024 * 1024) {
+      await reader.cancel();
+      return NextResponse.json({ error: "The conversion worker returned an oversized file." }, { status: 502 });
+    }
+    chunks.push(value);
+  }
+  if (totalBytes < 5) return NextResponse.json({ error: "The conversion worker returned an invalid file size." }, { status: 502 });
+  const result = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+  const signature = result.subarray(0, 5).toString("ascii");
   if (signature !== "%PDF-") return NextResponse.json({ error: "The conversion worker response was not a valid PDF." }, { status: 502 });
   return new NextResponse(result, {
     status: 200,
