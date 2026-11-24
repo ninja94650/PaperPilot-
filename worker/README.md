@@ -1,48 +1,61 @@
-# PaperPilot LibreOffice worker
+# PaperPilot isolated Office worker and security scanner
 
-This is the isolated DOC/DOCX/PPT/PPTX-to-PDF service used by the authenticated Next.js API proxy.
+The worker has two queue stages: ClamAV inspection, then LibreOffice conversion. It polls PaperPilot's authenticated internal API; it does not need direct database credentials.
 
-## Run locally
+## Local setup
 
-Create a long random token (at least 32 characters), then:
+Requirements: Docker Compose and enough host memory for the scanner (ClamAV's official Docker guidance recommends 4 GiB for the scanner container).
+
+Set these variables in your shell or a local .env file in this directory:
+
+- DOCUMENT_WORKER_TOKEN — random secret, at least 32 characters; must match the server-only Vercel variable
+- PAPERPILOT_API_URL — PaperPilot application base URL, without a trailing slash
+- PAPERPILOT_WORKER_ID — stable unique worker label, for example office-worker-1
+
+Then run:
 
 ```bash
-cd worker
-export DOCUMENT_WORKER_TOKEN="replace-with-a-long-random-secret"
 docker compose up --build
 ```
 
-Health check: `http://localhost:8080/healthz`.
+The ClamAV service is reachable only on the Compose network at clamav:3310. Do not publish that port; clamd's TCP protocol is unencrypted. The ClamAV database is persisted in the clamav-db volume and is updated by the official image.
 
-The worker accepts `POST /convert` with multipart field `file` and an Authorization bearer token. It returns PDF bytes.
+## Queue flow
 
-## Input validation
+1. An authenticated user uploads to the private documents bucket and submits an idempotent Office conversion job.
+2. The API stores the job as queued with scan_status=pending. No worker may process it yet.
+3. The scanner claims a short lease, downloads a short-lived signed input URL, and scans it through ClamAV INSTREAM.
+4. A clean result changes scan_status to clean. Rejected or repeatedly unavailable scans fail closed.
+5. The converter claims only clean jobs, renews its processing lease, validates the Office signature/OOXML archive, and converts in a disposable LibreOffice profile.
+6. The generated PDF is scanned again. Only a clean PDF is uploaded to a random private output key and published as an immutable document revision.
+7. Users poll the owner-scoped status endpoint and obtain a short-lived signed download URL only after success.
 
-- All uploads are limited to 20 MB.
-- DOCX/PPTX ZIP packages are checked before LibreOffice sees them.
-- The validator rejects malformed/truncated directory records, ZIP64 and multi-disk packages, encrypted entries, unsupported compression methods, duplicate or traversal paths, symbolic links, macro payloads, missing Office document parts, excessive entry counts, oversized expanded entries, excessive total expanded size, and extreme compression ratios.
-- Current OOXML bounds: 1,000 entries, 32 MiB per expanded entry, 128 MiB total expanded data and a 200:1 maximum per-entry compression ratio.
-- Legacy DOC/PPT files are checked for their OLE signature and upload size, but do not receive the OOXML ZIP-entry checks.
+The worker uses the same bearer token for its internal API calls. Keep it secret and rotate it if exposed. Do not place the Supabase service-role key in the worker or browser.
 
-These checks are a pre-parser resource and structure gate, not malware scanning, content disarm/reconstruction, or proof that a document is safe. Keep conversion disabled for public users until malware/CDR controls and the production isolation requirements below are met.
+## Limits and validation
 
-## Connect to PaperPilot
+- Input maximum: 20 MiB; output maximum: 40 MiB.
+- OOXML archive bounds: 1,000 entries, 32 MiB per expanded entry, 128 MiB total expanded data, and 200:1 maximum per-entry compression ratio.
+- Reject ZIP64/multi-disk archives, encrypted entries, unsupported compression methods, duplicate or traversal paths, symbolic links, macro payloads and missing main document parts.
+- Legacy DOC/PPT files receive OLE signature and size checks; they do not receive the OOXML ZIP checks.
+- LibreOffice runs as non-root with per-job random input/output/profile directories and a 90-second default timeout.
+- ClamAV errors, unavailable signatures and malformed responses fail closed. A scanner verdict is not a guarantee against all malware.
 
-Set these server-only Vercel environment variables:
+## Tests
 
-- `DOCUMENT_WORKER_URL` — the public HTTPS base URL of this service
-- `DOCUMENT_WORKER_TOKEN` — the exact same secret as the worker
+Run:
 
-The PaperPilot proxy requires a signed-in user and limits incoming files to 20 MB.
+```bash
+npm ci --prefix worker
+npm test --prefix worker
+```
 
-## Production deployment requirements
+Tests include Office signature/archive validation and a fake ClamD TCP server for clean, infected and invalid-input cases.
 
-- Use a private network or IP allowlist so only the PaperPilot API can reach the worker.
-- Enforce outbound network restrictions at the host or platform firewall.
-- Put an HTTPS reverse proxy in front of the worker; do not expose port 8080 publicly without it.
-- Keep the worker non-root, read-only, resource-limited and ephemeral as configured in Compose.
-- Add platform-level request rate limits and monitoring before public launch.
-- Rotate the shared bearer token if it is exposed.
-- LibreOffice is a complex file parser; keep the container patched and never mount user data or host directories into it.
+## Deployment gates
 
-The Compose limits are a baseline, not a substitute for host-level egress restrictions, malware scanning, queueing and observability.
+- Keep the worker on a private network or IP allowlist, behind HTTPS at the API boundary, with outbound egress restrictions.
+- The Compose file is a local/self-hosted reference, not a Vercel deployment. Do not expose port 8080 publicly without a hardened reverse proxy.
+- Add host-level rate limiting, alerting, resource monitoring, signature freshness checks and incident response before public launch.
+- ClamAV is GPLv2; review COPYING and third-party notices before redistributing the image. See docs/LICENSING-0.2.1.md.
+- The OOXML validator is a structural/resource gate, not CDR. The worker is not production-approved until security review, sandbox verification and end-to-end tests are complete.
