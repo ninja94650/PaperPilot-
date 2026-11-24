@@ -56,7 +56,7 @@ Tests include Office signature/archive validation and a fake ClamD TCP server fo
 ## Deployment gates
 
 - Keep the worker on a private network or IP allowlist, behind HTTPS at the API boundary, with outbound egress restrictions.
-- The Compose file is a local/self-hosted reference, not a Vercel deployment. Do not expose port 8080 publicly without a hardened reverse proxy.
+- The Compose file is a local/self-hosted reference, not a Vercel deployment. Port 8080 binds to 127.0.0.1 only; place a hardened HTTPS reverse proxy and allowlist in front if remote worker access is required. The legacy synchronous /convert endpoint returns 410 so it cannot bypass the malware-scan queue. The queue runner processes one job at a time per container.
 - Add host-level rate limiting, alerting, resource monitoring, signature freshness checks and incident response before public launch.
 - ClamAV is GPLv2; review COPYING and third-party notices before redistributing the image. See docs/LICENSING-0.2.1.md.
 - The OOXML validator is a structural/resource gate, not CDR. The worker is not production-approved until security review, sandbox verification and end-to-end tests are complete.
