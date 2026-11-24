@@ -8,7 +8,13 @@ export type PdfPageSource = PDFDocumentProxy;
 
 export async function loadPdfForWorkspace(file: File): Promise<PDFDocumentProxy> {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return getDocument({ data: bytes }).promise;
+  const task = getDocument({ data: bytes });
+  const document = await task.promise;
+  if (document.numPages > 150) {
+    await task.destroy();
+    throw new Error("This workspace supports up to 150 pages per PDF to protect browser memory.");
+  }
+  return document;
 }
 
 export async function exportPdfPageOrder(file: File, pageOrder: number[]): Promise<File> {
@@ -36,7 +42,9 @@ export async function compressPdfRasterized(
 
   for (let pageNumber = 1; pageNumber <= total; pageNumber += 1) {
     const page = await source.getPage(pageNumber);
-    const viewport = page.getViewport({ scale });
+    const baseViewport = page.getViewport({ scale: 1 });
+    const safeScale = Math.min(scale, Math.sqrt(16_000_000 / Math.max(1, baseViewport.width * baseViewport.height)));
+    const viewport = page.getViewport({ scale: safeScale });
     const canvas = document.createElement("canvas");
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
@@ -63,6 +71,7 @@ export async function compressPdfRasterized(
 
 export async function ocrPdf(file: File, language: string, onProgress?: (completed: number, total: number) => void): Promise<string> {
   const source = await loadPdfForWorkspace(file);
+  if (source.numPages > 100) throw new Error("OCR is limited to 100 pages per file in the browser.");
   const worker = await createWorker(language);
   const output: string[] = [];
   try {
@@ -116,6 +125,7 @@ export async function imageFilesToPdf(files: File[]): Promise<File> {
 
 export async function pdfToPngs(file: File): Promise<File[]> {
   const source = await loadPdfForWorkspace(file);
+  if (source.numPages > 100) throw new Error("Image export is limited to 100 pages per file in the browser.");
   const output: File[] = [];
   for (let pageNumber = 1; pageNumber <= source.numPages; pageNumber += 1) {
     const page = await source.getPage(pageNumber);
