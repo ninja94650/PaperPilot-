@@ -42,15 +42,20 @@ export default function PdfPageWorkspace({ file, onChange }: { file: File; onCha
 
   useEffect(() => {
     let alive = true;
+    let loadedDocument: PdfPageSource | null = null;
     setDocument(null);
     setError("");
     loadPdfForWorkspace(file).then((loaded) => {
-      if (!alive) return;
+      if (!alive) { void loaded.cleanup(); return; }
+      loadedDocument = loaded;
       setDocument(loaded);
       setOrder(Array.from({ length: loaded.numPages }, (_, index) => index));
       setSelected(0);
     }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load this PDF."));
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      if (loadedDocument) void loadedDocument.cleanup();
+    };
   }, [file]);
 
   useEffect(() => {
