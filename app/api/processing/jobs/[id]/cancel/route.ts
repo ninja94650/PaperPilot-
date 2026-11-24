@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { selectOwnedRecord } from "@/lib/processing/owned-query.mjs";
+import { consumeProcessingRateLimit } from "@/lib/processing/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,15 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   catch { return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 }); }
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
+  try {
+    const limit = await consumeProcessingRateLimit(supabase, "job:cancel");
+    if (!limit.allowed) return NextResponse.json(
+      { error: "Too many cancellation requests. Please retry after the rate limit window.", retryAfterSeconds: limit.retryAfterSeconds },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds), "X-RateLimit-Remaining": "0", "Cache-Control": "no-store" } }
+    );
+  } catch {
+    return NextResponse.json({ error: "Processing request protection is temporarily unavailable." }, { status: 503 });
+  }
   const { id } = await context.params;
   const { data: owned } = await selectOwnedRecord(supabase, "processing_jobs", "id,status", id, user.id);
   if (!owned) return NextResponse.json({ error: "Processing job not found." }, { status: 404 });
@@ -24,8 +34,6 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   const update = owned.status === "queued"
     ? { status: "cancelled", cancel_requested_at: now, completed_at: now, progress_message: "Cancelled by user", updated_at: now }
     : { cancel_requested_at: now, progress_message: "Cancellation requested", updated_at: now };
-  // Compare-and-set the exact observed state. If a worker claimed the job between
-  // the read and this update, return 409 rather than cancelling a running job as queued.
   const { data: job, error } = await admin.from("processing_jobs").update(update)
     .eq("id", id).eq("owner_id", user.id).eq("status", owned.status)
     .select("id,status,cancel_requested_at,progress_message").maybeSingle();
@@ -35,8 +43,6 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     job_id: id, owner_id: user.id, event_type: "cancellation_requested",
     status: job.status, progress_percent: 0, message: "Cancellation requested by user"
   });
-  if (eventError) {
-    console.error("Failed to append processing cancellation event", { jobId: id, code: eventError.code });
-  }
+  if (eventError) console.error("Failed to append processing cancellation event", { jobId: id, code: eventError.code });
   return NextResponse.json({ job }, { status: 202, headers: { "Cache-Control": "no-store" } });
 }
