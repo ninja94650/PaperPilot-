@@ -57,7 +57,7 @@ Implemented in source:
 - Download endpoint only issues short-lived links for completed immutable revisions.
 
 Remaining:
-- Add tests for worker crash, expired lease, retry delay, cancellation during LibreOffice, duplicate delivery and output publication races.
+- Add integration tests for worker crash, expired lease, retry delay, cancellation during LibreOffice, duplicate delivery and concurrent publication. ClamAV protocol unit tests now cover clean, infected, protocol-error and invalid-size outcomes.
 - Add SSE/realtime only if polling becomes insufficient; status GET remains the reconnect/recovery source of truth.
 
 ## Phase 5 — Security, observability and release gates
