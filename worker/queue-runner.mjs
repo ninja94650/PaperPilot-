@@ -143,6 +143,7 @@ async function processOne() {
     const pdf = await convert(bytes, name, extension);
     const scan = await scanWithClamAv(pdf);
     if (!scan.clean) throw new Error("The generated PDF failed malware inspection.");
+    await beat(95, "Publishing private output revision");
     const form = new FormData();
     form.append("jobId", job.id);
     form.append("workerId", workerId);
