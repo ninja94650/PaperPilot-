@@ -69,3 +69,18 @@ export async function addTextToPdf(file: File, text: string, signature = false):
   });
   return { bytes: await document.save({ useObjectStreams: true }), filename: outputName(file.name, signature ? "signed" : "annotated") };
 }
+
+export async function splitPdf(file: File): Promise<PdfResult[]> {
+  const source = await PDFDocument.load(await file.arrayBuffer());
+  const total = source.getPageCount();
+  if (total < 2) throw new Error("This PDF has only one page, so it cannot be split.");
+  const stem = file.name.replace(/\.pdf$/i, "").replace(/[^a-z0-9-_]/gi, "-") || "document";
+  const results: PdfResult[] = [];
+  for (let index = 0; index < total; index += 1) {
+    const output = await PDFDocument.create();
+    const [page] = await output.copyPages(source, [index]);
+    output.addPage(page);
+    results.push({ bytes: await output.save({ useObjectStreams: true }), filename: stem + "-page-" + (index + 1) + ".pdf" });
+  }
+  return results;
+}
