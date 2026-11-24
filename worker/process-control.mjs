@@ -1,6 +1,6 @@
-export function terminateProcessTree(child, signal = "SIGKILL", killGroup = process.kill) {
+export function terminateProcessTree(child, signal = "SIGKILL", killGroup = process.kill, useProcessGroup = false) {
   if (!child) return false;
-  if (child.pid && child.detached) {
+  if (child.pid && useProcessGroup) {
     try {
       killGroup(-child.pid, signal);
       return true;
