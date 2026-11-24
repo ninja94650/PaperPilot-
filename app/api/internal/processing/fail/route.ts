@@ -33,9 +33,13 @@ export async function POST(request: NextRequest) {
   const job = Array.isArray(data) ? data[0] : data;
   if (!job) return NextResponse.json({ error: "The worker lease expired before failure was recorded." }, { status: 409 });
   if (current.output_storage_path && current.output_storage_path.startsWith(current.owner_id + "/" + jobId + "/")) {
-    await admin.storage.from("documents").remove([current.output_storage_path]);
-    await admin.from("processing_jobs").update({ output_storage_path: null, output_metadata: {} })
-      .eq("id", jobId).eq("output_storage_path", current.output_storage_path);
+    const { error: cleanupError } = await admin.storage.from("documents").remove([current.output_storage_path]);
+    if (!cleanupError) {
+      await admin.from("processing_jobs").update({ output_storage_path: null, output_metadata: {} })
+        .eq("id", jobId).eq("output_storage_path", current.output_storage_path);
+    } else {
+      console.error("Processing output cleanup deferred to the periodic sweeper", { jobId, code: cleanupError.name });
+    }
   }
   await admin.from("processing_job_events").insert({
     job_id: jobId, owner_id: current.owner_id,
