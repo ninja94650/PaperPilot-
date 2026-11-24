@@ -84,7 +84,8 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124161331_paperpilot_cancel_expired_processing_jobs.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124162518_paperpilot_processing_least_privilege_grants.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124163000_paperpilot_atomic_revision_publish.sql
-      - name: Execute cross-tenant RLS and expired-lease recovery fixture
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124170000_paperpilot_processing_api_rate_limits.sql
+      - name: Execute cross-tenant RLS, lease recovery and API rate-limit fixture
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/processing_pipeline_rls_and_recovery.sql
 
   clamav-integration:
