@@ -18,25 +18,41 @@ For production email confirmation and password recovery, configure the Supabase 
 
 Configure SMTP before relying on production email delivery.
 
-## LibreOffice worker
+## Secure asynchronous processing worker
 
-A deployable Docker worker is included in worker/. It accepts authenticated multipart POST /convert requests and returns PDF bytes. The web API requires a signed-in PaperPilot user and proxies the request to this isolated worker.
+PaperPilot 0.2.1 adds a Postgres-backed job queue and a self-hosted worker reference in worker/. The synchronous web proxy was retired; Office conversion now uses the authenticated queue APIs.
 
-The worker validates extensions and file signatures, limits input to 20 MB, checks DOCX/PPTX ZIP structure and expansion bounds before conversion, runs LibreOffice as a non-root user in an isolated temporary directory, limits concurrency and conversion time, checks the output PDF signature, and removes job files after each request.
+The flow is:
+1. A signed-in user uploads an Office document to the private documents bucket.
+2. The server verifies ownership and creates an idempotent processing job in queued / scan_status=pending.
+3. A separate scan lease is claimed through the internal worker API. ClamAV scans the input; only a clean verdict permits conversion.
+4. The conversion worker claims a clean job, downloads a short-lived signed URL, validates the Office extension/signature and OOXML archive bounds, and runs LibreOffice in a per-job temporary profile.
+5. The output PDF is scanned again. A clean result is uploaded under a random private key and published as an immutable document revision.
+6. Users can poll owner-scoped status/events, request cancellation, and download a completed revision using a 60-second signed URL.
 
-OOXML package bounds:
-- 1,000 entries maximum
-- 32 MiB maximum expanded size per entry
-- 128 MiB maximum aggregate expanded size
+The worker has no Supabase service-role key. It authenticates to internal endpoints with DOCUMENT_WORKER_TOKEN. The web deployment needs these server-only variables:
+- SUPABASE_SERVICE_ROLE_KEY — required for server-controlled queue and private output publication; never expose it with NEXT_PUBLIC_
+- DOCUMENT_WORKER_TOKEN — random secret of at least 32 characters, shared with the worker
+- NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY — already used by the authenticated app
+
+The worker Compose environment also requires:
+- PAPERPILOT_API_URL — PaperPilot application base URL without a trailing slash
+- PAPERPILOT_WORKER_ID — unique worker label
+- DOCUMENT_WORKER_TOKEN — same secret as the web deployment
+
+ClamAV runs as a separate container on the private Compose network at port 3310. Do not publish this port: ClamD TCP is unencrypted. ClamAV needs persistent signature storage and outbound access to its signature mirrors; restrict this egress at the host firewall. Its official image guidance recommends 4 GiB memory for the scanner container.
+
+Office validation bounds:
+- Input maximum 20 MiB; output maximum 40 MiB
+- 1,000 OOXML entries maximum
+- 32 MiB expanded size per entry
+- 128 MiB aggregate expanded size
 - 200:1 maximum per-entry compression ratio
-- ZIP64, multi-disk, encrypted, duplicate-path, traversal-path, symlink and macro payload entries are rejected
+- ZIP64, multi-disk, encrypted, duplicate, traversal, symlink and macro payload entries are rejected
 
-These checks reduce malformed-package and decompression-bomb risk; they are not malware scanning or CDR. Legacy DOC/PPT inputs receive OLE signature and file-size checks only. Do not expose Office conversion publicly until malware/CDR scanning, host-level egress restrictions, private networking, rate limiting and end-to-end security tests are in place.
+Legacy DOC/PPT inputs receive OLE signature and size checks only. Structural checks are not malware scanning or CDR. ClamAV is signature-based and cannot guarantee detection of every threat.
 
-Set server-only Vercel variables:
-- DOCUMENT_WORKER_URL: public HTTPS base URL of the worker
-- DOCUMENT_WORKER_TOKEN: same long random bearer token configured in the worker
-- NEXT_PUBLIC_APP_URL: canonical PaperPilot origin (also used by ONLYOFFICE callbacks)
+Do not expose processing publicly until the worker is deployed on a private/self-hosted network with HTTPS at the API boundary, host-level egress restrictions, rate limiting, monitoring, verified resource limits, current signatures, and cross-user/cancellation/cleanup E2E tests. See docs/ROADMAP-0.2.1.md and docs/WORKER-CONTRACT.md.
 
 ## ONLYOFFICE Docs
 
