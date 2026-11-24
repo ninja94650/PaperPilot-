@@ -24,7 +24,7 @@ Every internal route requires Authorization: Bearer DOCUMENT_WORKER_TOKEN. Compa
 | POST | /api/internal/processing/claim | Atomically claim a clean processing job and receive a signed input URL |
 | POST | /api/internal/processing/heartbeat | Renew an active lease, update progress and expose cancellation requests |
 | POST | /api/internal/processing/output-upload | Create a one-object signed upload URL for the active attempt |
-| POST | /api/internal/processing/complete | Verify uploaded object metadata and publish an immutable PDF revision |
+| POST | /api/internal/processing/complete | Verify uploaded object metadata and invoke the atomic idempotent revision publisher |
 | POST | /api/internal/processing/fail | Record a failure, schedule bounded retry or finalize the job |
 
 ## Worker behavior
@@ -36,7 +36,7 @@ Every internal route requires Authorization: Bearer DOCUMENT_WORKER_TOKEN. Compa
 - Default processing retry budget is 3 attempts with exponential backoff capped at 15 minutes. Scan attempts are capped at 3.
 - Heartbeat renews the lease. Cancellation is cooperative at stage boundaries; hard process termination remains an orchestrator responsibility.
 - Input URLs are short-lived signed URLs. Output keys are random, private, and attempt-specific. The original object is not overwritten.
-- Output revisions are immutable and have per-document monotonically increasing version numbers. Users receive signed download links only after success.
+- Output revisions are immutable and have per-document monotonically increasing version numbers. A row-locked Postgres RPC publishes the revision, finalizes the job and records the completion event in one transaction; retries return the same revision. Users receive signed download links only after success.
 - Supported queued tool in this increment: DOC/DOCX/PPT/PPTX to PDF. Other tools remain browser-local or unavailable until their worker implementation is added.
 
 ## Office validation and limits
