@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileStack, LoaderCircle, LockKeyhole, Mail } from "lucide-react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import "@/app/auth.css";
 
 export default function LoginPage() {
   const router = useRouter();
