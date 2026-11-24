@@ -127,7 +127,7 @@ from public.claim_processing_job('recovery-worker',180)
 where id=(select recovery_job from paperpilot_fixture_ids);
 reset role;
 
-do $
+do $$
 begin
   raise notice 'rate limit rows: owner A allowed %, denied %, owner B rows %',
     (select count(*) from paperpilot_rate_limit_results where owner_label='owner-a' and allowed),
