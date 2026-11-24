@@ -15,7 +15,8 @@ export default function CloudLibrary({ initialDocuments }: { initialDocuments: D
 
   async function upload(file?: File) {
     if (!file || busy) return;
-    if (file.size > 20 * 1024 * 1024) { setNotice("Files must be 20 MB or smaller."); return; }
+    if (file.size < 1 || file.size > 20 * 1024 * 1024) { setNotice("Files must be between 1 byte and 20 MB."); return; }
+    if (!/\.(pdf|doc|docx|ppt|pptx|jpg|jpeg|png|webp)$/i.test(file.name)) { setNotice("Choose a PDF, Office document, JPG, PNG or WebP file."); return; }
     setBusy(true); setNotice("");
     const supabase = createClient();
     try {
