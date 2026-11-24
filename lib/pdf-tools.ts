@@ -124,3 +124,21 @@ export async function imageToPdf(files:File[]):Promise<PdfResult>{
  const page=output.addPage([image.width,image.height]);page.drawImage(image,{x:0,y:0,width:image.width,height:image.height});}
  return {bytes:await output.save({useObjectStreams:true}),filename:"paperpilot-images.pdf"};
 }
+
+export async function splitPdf(file: File): Promise<PdfResult[]> {
+ const source=await PDFDocument.load(await file.arrayBuffer()); const count=source.getPageCount();
+ if(count<2) throw new Error("This PDF has only one page, so it cannot be split into multiple files.");
+ const results:PdfResult[]=[];
+ for(let index=0;index<count;index++){const output=await PDFDocument.create();const [page]=await output.copyPages(source,[index]);output.addPage(page);results.push({bytes:await output.save({useObjectStreams:true}),filename:outputName(file.name,"page-"+(index+1))});}
+ return results;
+}
+export async function optimizePdf(file:File):Promise<PdfResult>{const source=await PDFDocument.load(await file.arrayBuffer());return {bytes:await source.save({useObjectStreams:true,addDefaultPage:false}),filename:outputName(file.name,"optimized")};}
+export async function imageToPdf(files:File[]):Promise<PdfResult>{
+ if(!files.length) throw new Error("Choose at least one JPG or PNG image."); const output=await PDFDocument.create();
+ for(const file of files){const bytes=await file.arrayBuffer();const lower=file.name.toLowerCase();let image;
+ if(file.type==="image/png"||lower.endsWith(".png")) image=await output.embedPng(bytes);
+ else if(file.type==="image/jpeg"||lower.endsWith(".jpg")||lower.endsWith(".jpeg")) image=await output.embedJpg(bytes);
+ else throw new Error("Only JPG and PNG images can be converted in this tool.");
+ const page=output.addPage([image.width,image.height]);page.drawImage(image,{x:0,y:0,width:image.width,height:image.height});}
+ return {bytes:await output.save({useObjectStreams:true}),filename:"paperpilot-images.pdf"};
+}
