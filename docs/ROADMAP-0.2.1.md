@@ -11,9 +11,10 @@ Implemented in source and linked Supabase schema:
 - Retry backoff is bounded and cancellation is represented in the database.
 - Owner-scoped job status, event history, idempotent creation and cancellation APIs are present.
 - Authenticated users can select their own jobs but cannot directly insert/update/delete queue records.
+- Processing API calls use a database-backed per-user fixed-window quota: job creation 10/minute, status 60/minute, cancellation 10/minute and downloads 10/minute. The browser cannot choose limits; a rate-limit backend error fails closed.
 
 Remaining:
-- Disposable PostgreSQL CI regression now verifies owner A/B visibility for jobs, events and revisions, plus expired processing lease reclamation. Simultaneous claim races and cancellation/claim races still need dedicated concurrent tests.
+- Disposable PostgreSQL CI regression now verifies owner A/B visibility for jobs, events and revisions, plus expired processing lease reclamation. It also verifies the first 10 job-create requests are allowed, the 11th is denied, and a second user receives an independent quota. Simultaneous claim races and cancellation/claim races still need dedicated concurrent tests.
 - Add operator-visible DLQ/re-drive controls only after authorization and audit design.
 
 ## Phase 2 — Security inspection and quarantine gate
