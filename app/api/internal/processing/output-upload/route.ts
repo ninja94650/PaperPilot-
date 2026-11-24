@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAuthorizedWorker } from "@/lib/processing/worker-auth";
@@ -27,12 +26,12 @@ export async function POST(request: NextRequest) {
     || !job.lease_expires_at || new Date(job.lease_expires_at).getTime() <= Date.now()) {
     return NextResponse.json({ error: "The processing lease is no longer valid." }, { status: 409 });
   }
-  const storagePath = job.owner_id + "/" + job.id + "/" + randomUUID() + "/result.pdf";
+  const storagePath = job.owner_id + "/" + job.id + "/attempt-" + attempt + "/result.pdf";
   const { data, error: signError } = await admin.storage.from("documents").createSignedUploadUrl(storagePath, { upsert: false });
   if (signError || !data?.token || !data.signedUrl) {
     return NextResponse.json({ error: "Could not create a one-object private upload token." }, { status: 500 });
   }
-  return NextResponse.json({ storagePath, token: data.token, signedUrl: data.signedUrl }, {
+  return NextResponse.json({ storagePath, signedUrl: data.signedUrl }, {
     headers: { "Cache-Control": "no-store" }
   });
 }
