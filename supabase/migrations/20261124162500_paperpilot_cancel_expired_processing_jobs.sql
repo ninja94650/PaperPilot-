@@ -18,7 +18,8 @@ as $$
         error_message='Worker lease expired after maximum attempts.',
         last_error_code='lease_expired', worker_id=null, lease_expires_at=null,
         updated_at=pg_catalog.now()
-    where status='running' and lease_expires_at <= pg_catalog.now()
+    where status='running' and cancel_requested_at is null
+      and lease_expires_at <= pg_catalog.now()
       and attempt_count >= max_attempts
     returning id
   ),
