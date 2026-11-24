@@ -64,7 +64,8 @@ export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
         const result = new File([blob], file.name.replace(/\.(docx?|pptx?)$/i, "") + ".pdf", { type: "application/pdf" });
         download(result);
         onResult(result);
-        setMessage("Office document converted to PDF.");
+        const jobId = response.headers.get("X-PaperPilot-Job-Id");
+        setMessage("Office document converted to PDF." + (jobId ? " Job ID: " + jobId.slice(0, 8) : ""));
       }
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "The operation could not be completed.");
