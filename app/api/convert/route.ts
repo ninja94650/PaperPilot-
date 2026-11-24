@@ -13,11 +13,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DOCX/PPTX conversion is not connected yet. Configure the isolated LibreOffice worker in the deployment environment." }, { status: 503 });
   }
 
-  let supabase;
-  try { supabase = await createClient(); }
-  catch { return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 }); }
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const supabase = await createClient().catch(() => null);
+  if (!supabase) return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 });
+  const { data: userData, error: authError } = await supabase.auth.getUser();
+  const user = userData.user;
   if (authError || !user) return NextResponse.json({ error: "Sign in is required for Office conversion." }, { status: 401 });
+  const ownerId = user.id;
 
   const incoming = await request.formData();
   const file = incoming.get("file");
@@ -32,14 +33,15 @@ export async function POST(request: Request) {
     input_metadata: { file_name: file.name, size_bytes: file.size }
   }).select("id").single();
   if (jobError || !job) return NextResponse.json({ error: "Could not create a processing record. Try again." }, { status: 500 });
+  const jobId = job.id;
 
   async function fail(message: string, status: number) {
     await supabase.from("processing_jobs").update({
       status: "failed",
       error_message: message.slice(0, 500),
       completed_at: new Date().toISOString()
-    }).eq("id", job.id).eq("owner_id", user.id);
-    return NextResponse.json({ error: message, jobId: job.id }, { status });
+    }).eq("id", jobId).eq("owner_id", ownerId);
+    return NextResponse.json({ error: message, jobId }, { status });
   }
 
   try {
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/pdf",
         "Content-Disposition": "attachment; filename=\"paperpilot-converted.pdf\"",
         "Cache-Control": "private, no-store",
-        "X-PaperPilot-Job-Id": job.id
+        "X-PaperPilot-Job-Id": jobId
       }
     });
   } catch {
