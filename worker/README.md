@@ -51,7 +51,7 @@ npm ci --prefix worker
 npm test --prefix worker
 ```
 
-Tests include Office signature/archive validation and a fake ClamD TCP server for clean, infected, protocol-error and invalid-size cases.
+Tests include Office signature/archive validation, a fake ClamD TCP server for clean, infected, protocol-error and invalid-size cases, an HTTP regression test for the retired synchronous endpoint, and a cancellation test that verifies the LibreOffice child process is terminated.
 
 ## Deployment gates
 
