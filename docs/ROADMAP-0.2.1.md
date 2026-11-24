@@ -68,6 +68,11 @@ Implemented in source:
 - Output and input paths are private and not returned to the browser.
 - Scanner and worker limits are documented; license note records ClamAV GPLv2.
 
+Verified against the linked Supabase project:
+- Atomic publish RPC passed a rollback-only SQL smoke test: two identical completion calls returned the same revision ID/version, job reached succeeded, and source document reached ready.
+- RLS is enabled on jobs, revisions and events. Authenticated role has SELECT only on jobs and cannot INSERT/UPDATE/DELETE or execute the privileged publish RPC; service_role can execute the RPC.
+- Supabase security advisor currently returns no findings. Performance advisor only reports unused-index notices on the low-volume/empty tables.
+
 Remaining before public use:
 - Automated cross-user/IDOR tests for every API route and storage object.
 - Callback-forgery and malformed input regression tests.
