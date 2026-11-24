@@ -18,6 +18,7 @@ export default function OnlyOfficeLauncher({ documentId }: { documentId: string 
   const [loading, setLoading] = useState(false);
   const [editor, setEditor] = useState<EditorConfig | null>(null);
   const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
 
   async function launch() {
     setLoading(true); setError("");
@@ -26,6 +27,7 @@ export default function OnlyOfficeLauncher({ documentId }: { documentId: string 
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "ONLYOFFICE could not be opened.");
       setEditor(payload as EditorConfig);
+      setReady(false);
       setOpen(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not open the editor.");
@@ -39,7 +41,7 @@ export default function OnlyOfficeLauncher({ documentId }: { documentId: string 
     const scriptUrl = editor.documentServerUrl.replace(/\/+$/, "") + "/web-apps/apps/api/documents/api.js";
     const initialize = () => {
       if (cancelled || !window.DocsAPI) return;
-      const config = { ...editor.config };
+      const config = { ...editor.config, events: { onDocumentReady: () => setReady(true), onError: () => setError("The ONLYOFFICE editor reported an error.") } };
       instance = new window.DocsAPI.DocEditor(elementId, config);
     };
     const existing = document.querySelector<HTMLScriptElement>('script[data-paperpilot-onlyoffice="true"]');
@@ -62,8 +64,8 @@ export default function OnlyOfficeLauncher({ documentId }: { documentId: string 
     {error && <span className="onlyoffice-error" role="status">{error}</span>}
     {open && editor && <div className="onlyoffice-backdrop">
       <section className="onlyoffice-window">
-        <header><b>PaperPilot · ONLYOFFICE editor</b><button onClick={() => { setOpen(false); setEditor(null); }} aria-label="Close editor"><X size={18} /></button></header>
-        <div id={elementId} className="onlyoffice-frame"><div className="onlyoffice-loading"><LoaderCircle className="spin" size={22} /> Connecting to ONLYOFFICE…</div></div>
+        <header><b>PaperPilot · ONLYOFFICE editor</b><button onClick={() => { setOpen(false); setEditor(null); setReady(false); }} aria-label="Close editor"><X size={18} /></button></header>
+        <div id={elementId} className="onlyoffice-frame">{!ready && <div className="onlyoffice-loading"><LoaderCircle className="spin" size={22} /> Connecting to ONLYOFFICE…</div>}</div>
       </section>
     </div>}
   </>;
