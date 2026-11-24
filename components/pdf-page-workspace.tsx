@@ -12,7 +12,9 @@ function PageThumbnail({ document, pageNumber, selected, onSelect }: {
     let cancelled = false;
     async function render() {
       const page = await document.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 0.22 });
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(0.22, Math.sqrt(1_000_000 / Math.max(1, baseViewport.width * baseViewport.height)));
+      const viewport = page.getViewport({ scale });
       const canvas = canvasRef.current;
       const context = canvas?.getContext("2d");
       if (!canvas || !context || cancelled) return;
@@ -56,7 +58,9 @@ export default function PdfPageWorkspace({ file, onChange }: { file: File; onCha
     async function renderMain() {
       if (!document || !mainCanvas.current || order.length === 0) return;
       const page = await document.getPage(order[selected] + 1);
-      const viewport = page.getViewport({ scale: Math.min(1.35, 850 / page.getViewport({ scale: 1 }).width) });
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(1.35, 850 / baseViewport.width, Math.sqrt(16_000_000 / Math.max(1, baseViewport.width * baseViewport.height)));
+      const viewport = page.getViewport({ scale });
       const canvas = mainCanvas.current;
       const context = canvas.getContext("2d");
       if (!context) return;
