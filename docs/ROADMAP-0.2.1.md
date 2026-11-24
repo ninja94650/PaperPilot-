@@ -57,8 +57,8 @@ Implemented in source:
 - Download endpoint only issues short-lived links for completed immutable revisions.
 
 Remaining:
-- Run the cancellation/process-group tests in CI and in the Linux worker container; verify no LibreOffice descendants survive abort or timeout.
-- Run the opt-in live ClamAV integration suite with fresh signatures (`CLAMAV_INTEGRATION=1`) in an isolated environment. The EICAR fixture is harmless test content; a skipped integration test is not a live scanner pass.
+- CI run #126 passed Linux process-group cancellation integration: cancelling the detached worker also terminated a spawned descendant. The test is Linux-only; Windows process-tree termination remains a separate platform consideration.
+- Run the opt-in live ClamAV integration suite with fresh signatures (`CLAMAV_INTEGRATION=1`) in an isolated environment. The EICAR fixture is harmless test content; skipped integration tests are not a live scanner pass.
 - Exercise worker crash, retry delay, duplicate delivery and concurrent publication in a disposable Supabase environment.
 - Add SSE/realtime only if polling becomes insufficient; status GET remains the reconnect/recovery source of truth.
 
@@ -74,16 +74,18 @@ Verified against the linked Supabase project:
 - Atomic publish RPC passed a rollback-only SQL smoke test: two identical completion calls returned the same revision ID/version, job reached succeeded, and source document reached ready.
 - RLS is enabled on jobs, revisions and events. Authenticated role has SELECT only on jobs and cannot INSERT/UPDATE/DELETE or execute the privileged publish RPC; service_role can execute the RPC.
 - Supabase security advisor currently returns no findings. Performance advisor only reports unused-index notices on the low-volume/empty tables.
+- Live privilege verification returned zero anon grants and zero authenticated write grants across processing jobs, events and revisions.
+- Live schema inspection confirmed processing event IDs use the expected sequence and the queue-claim RPC signature matches the regression fixture.
 
 Remaining before public use:
-- Added rollback-only SQL regression fixture `supabase/tests/processing_pipeline_rls_and_recovery.sql` covering owner A/B visibility for jobs, events and revisions plus expired processing-lease reclamation. Run it against a disposable Supabase database before release.
+- Added rollback-only SQL regression fixture `supabase/tests/processing_pipeline_rls_and_recovery.sql` covering owner A/B visibility for jobs, events and revisions plus expired processing-lease reclamation. It has been schema-reviewed and corrected to use the event ID sequence, but must run against a disposable Supabase database before release. Do not run it against production.
 - HTTP-level cross-user/IDOR tests for every API route and storage object remain.
 - Callback-forgery and malformed input regression tests.
 - Added opt-in live ClamAV EICAR and clean-PDF integration fixtures in `worker/clamav.integration.test.mjs`; not executed against a live scanner yet.
-- Added process-tree termination unit tests in `worker/process-control.test.mjs`; current CI has not yet reported a completed run for the newest head.
+- GitHub Actions run #126 passed on feature head `7562c9f0195b45eccfe846d18d26e6293c8b6416`: 24 worker tests passed, 2 opt-in live ClamAV tests skipped, both dependency audits reported zero vulnerabilities, TypeScript typecheck passed and Next.js production build passed.
 - Host-level rate limiting, egress controls, metrics/alerts, log redaction, retention cleanup and backup/restore verification.
-- Supabase security/performance advisor recheck and full GitHub CI pass.
-- Vercel deployment API quota has previously been exhausted; do not bypass or pay. Use GitHub CI and wait for the free quota reset before requesting a preview deployment.
+- Supabase security/performance advisor recheck and full GitHub CI pass on any subsequent code changes.
+- Vercel deployment API quota has previously been exhausted; do not bypass or pay. Wait for the free quota reset before requesting a preview deployment.
 - Verify Supabase Auth redirects and SMTP.
 - Review ClamAV GPLv2 distribution obligations and all container/package notices.
 
