@@ -9,6 +9,8 @@ import {
   Signature, LoaderCircle, Download, Upload, PanelLeftClose, Trash2
 } from "lucide-react";
 import { addTextToPdf, extractPages, mergePdfs, rotatePages } from "@/lib/pdf-tools";
+import PdfPageWorkspace from "@/components/pdf-page-workspace";
+import AdvancedToolDialog from "@/components/advanced-tool-dialog";
 
 type ToolId = "merge" | "split" | "rotate" | "extract" | "annotate" | "sign" | "compress" | "convert" | "ocr";
 type Tool = { id: ToolId; title: string; description: string; icon: typeof FileText; tint: string; ready: boolean; label?: string };
@@ -19,13 +21,13 @@ const accepted = ".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp";
 const tools: Tool[] = [
   { id: "merge", title: "Merge PDF", description: "Combine files into one clean document.", icon: Combine, tint: "violet", ready: true },
   { id: "split", title: "Split PDF", description: "Separate a document into smaller files.", icon: Scissors, tint: "blue", ready: true },
-  { id: "compress", title: "Compress PDF", description: "Reduce file size with quality controls.", icon: FileArchive, tint: "mint", ready: false, label: "Coming soon" },
-  { id: "convert", title: "Convert files", description: "PDF, Word, PowerPoint and images.", icon: FileImage, tint: "orange", ready: false, label: "Coming soon" },
+  { id: "compress", title: "Compress PDF", description: "Reduce file size with quality controls.", icon: FileArchive, tint: "mint", ready: true },
+  { id: "convert", title: "Convert files", description: "PDF pages and images, plus Office worker conversion.", icon: FileImage, tint: "orange", ready: true },
   { id: "annotate", title: "Edit PDF", description: "Add text notes to your pages.", icon: PenLine, tint: "pink", ready: true },
   { id: "sign", title: "Sign PDF", description: "Place a signature on your document.", icon: Signature, tint: "mint", ready: true },
   { id: "rotate", title: "Rotate PDF", description: "Fix page orientation in a click.", icon: RotateCw, tint: "blue", ready: true },
   { id: "extract", title: "Extract pages", description: "Keep only the pages you need.", icon: FilePlus2, tint: "orange", ready: true },
-  { id: "ocr", title: "OCR PDF", description: "Make scanned files searchable.", icon: ScanText, tint: "violet", ready: false, label: "Coming soon" }
+  { id: "ocr", title: "OCR PDF", description: "Recognize text in scanned pages.", icon: ScanText, tint: "violet", ready: true }
 ];
 
 function isPdf(file: File) {
@@ -60,12 +62,13 @@ export default function Dashboard() {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [activeAdvancedTool, setActiveAdvancedTool] = useState<"compress" | "convert" | "ocr" | null>(null);
   const [pageRange, setPageRange] = useState("1-1");
   const [annotation, setAnnotation] = useState("");
   const [signature, setSignature] = useState("");
   const [showTextPanel, setShowTextPanel] = useState<"annotate" | "sign" | null>(null);
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const activeFile = files[activeIndex] ?? null;
   const pdfFiles = files.filter(isPdf);
@@ -74,14 +77,8 @@ export default function Dashboard() {
   ), [search]);
 
   useEffect(() => {
-    if (!activeFile || !isPdf(activeFile)) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(activeFile);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [activeFile]);
+    if (activeAdvancedTool && files.length > 0) setShowAdvanced(true);
+  }, [activeAdvancedTool, files.length]);
 
   function importFiles(incoming: FileList | File[]) {
     const selected = Array.from(incoming);
@@ -117,8 +114,14 @@ export default function Dashboard() {
   }
   function chooseTool(id: ToolId) {
     const tool = tools.find((item) => item.id === id);
-    if (!tool?.ready) {
-      setNotice(tool?.title + " is on the PaperPilot roadmap. The local PDF workspace is available now.");
+    if (!tool?.ready) return;
+    if (id === "compress" || id === "convert" || id === "ocr") {
+      setActiveAdvancedTool(id);
+      if (files.length) setShowAdvanced(true);
+      else {
+        document.getElementById("file-picker")?.click();
+        setNotice("Choose a file to use " + tool.title + ".");
+      }
       return;
     }
     if (!files.length) {
@@ -179,6 +182,8 @@ export default function Dashboard() {
     setEditing(false);
     setShowTextPanel(null);
     setActiveTool(null);
+    setActiveAdvancedTool(null);
+    setShowAdvanced(false);
   }
 
   return (
@@ -197,7 +202,7 @@ export default function Dashboard() {
           <a href="#roadmap" onClick={() => setMobileMenu(false)}>Roadmap</a>
         </nav>
         <div className="header-actions">
-          <button className="text-button" onClick={() => setNotice("Accounts and cloud workspaces are planned for a future release.")}>Sign in</button>
+          <a className="text-button" href="/login">Sign in</a>
           <button className="header-cta" onClick={() => document.getElementById("upload-zone")?.scrollIntoView({ behavior: "smooth" })}>Get started <ArrowUpRight size={15} /></button>
         </div>
         <button className="mobile-menu-button" aria-label="Toggle navigation" onClick={() => setMobileMenu((value) => !value)}>{mobileMenu ? <X size={21} /> : <Menu size={21} />}</button>
@@ -245,7 +250,7 @@ export default function Dashboard() {
           <div className="queue-head"><div><b>{files.length} file{files.length > 1 ? "s" : ""} in your workspace</b><small>Files are ready for your next step</small></div><button className="clear-button" onClick={() => { setFiles([]); setActiveIndex(0); }}>Clear all <X size={13} /></button></div>
           <div className="queue-items">{files.map((file, index) => <div className="queue-file" key={file.name + file.lastModified + index}>
             <span className={"file-type-icon " + (isPdf(file) ? "pdf-icon" : "other-icon")}>{isPdf(file) ? <FileText size={18} /> : <FileImage size={18} />}</span>
-            <span className="queue-file-name"><b>{file.name}</b><small>{formatBytes(file.size)} · {isPdf(file) ? "Ready for PDF tools" : "Office/image tools coming soon"}</small></span>
+            <span className="queue-file-name"><b>{file.name}</b><small>{formatBytes(file.size)} · {isPdf(file) ? "Ready for PDF tools" : file.type.startsWith("image/") ? "Ready for image conversion" : "Office conversion needs a connected worker"}</small></span>
             <button aria-label={"Remove " + file.name} className="icon-button" onClick={() => { setFiles((current) => current.filter((_, i) => i !== index)); setActiveIndex((current) => Math.max(0, current > index ? current - 1 : current === index ? 0 : current)); }}><X size={15} /></button>
           </div>)}</div>
           <div className="queue-actions"><button className="primary-button compact" onClick={() => openEditor()}>Open PDF workspace <ArrowRight size={16} /></button></div>
@@ -260,7 +265,7 @@ export default function Dashboard() {
           <span className={"tool-icon " + tool.tint}><Icon size={21} strokeWidth={1.9} /></span><span className="tool-card-content"><b>{tool.title}</b><small>{tool.description}</small></span>
           {tool.label ? <span className="coming-label">{tool.label}</span> : <ArrowUpRight className="tool-arrow" size={17} />}
         </button>; })}</div>
-        <div className="more-tools-note"><Sparkles size={16} /> More ways to work with your files are on the way. <a href="#roadmap">See what’s next</a></div>
+        <div className="more-tools-note"><Sparkles size={16} /> Browser tools are ready; Office conversion and cloud editing need connected services. <a href="#roadmap">See integration notes</a></div>
       </section>
 
       <section id="how-it-works" className="how-section">
@@ -278,6 +283,13 @@ export default function Dashboard() {
       </div></section>
 
       <footer className="site-footer"><a className="brand footer-brand" href="#"><span className="brand-mark"><FileStack size={18} /></span><span>paper<span className="brand-accent">pilot</span><i>.</i></span></a><span>Thoughtful tools for the documents that move you.</span><span>© 2026 PaperPilot</span></footer>
+
+      {showAdvanced && activeAdvancedTool && <AdvancedToolDialog
+        tool={activeAdvancedTool}
+        files={files}
+        onClose={() => { setShowAdvanced(false); setActiveAdvancedTool(null); }}
+        onResult={(result) => { setFiles((current) => [...current, result]); setActiveIndex(files.length); }}
+      />}
 
       {notice && <div className="toast" role="status"><span><Check size={15} /></span>{notice}<button aria-label="Dismiss message" onClick={() => setNotice("")}><X size={15} /></button></div>}
 
@@ -320,10 +332,10 @@ export default function Dashboard() {
               </div>}
               <div className="preview-stage">
                 {busy && <div className="processing-shade"><LoaderCircle className="spin" size={26} /><b>Updating your document</b><small>Processing locally in your browser</small></div>}
-                {activeFile && isPdf(activeFile) && previewUrl ? <iframe key={previewUrl} className="pdf-frame" src={previewUrl + "#toolbar=1&navpanes=0"} title="PDF document preview" /> : <div className="empty-preview">
+                {activeFile && isPdf(activeFile) ? <PdfPageWorkspace file={activeFile} onChange={updateActiveFile} /> : <div className="empty-preview">
                   <div className="empty-preview-icon">{activeFile ? <ImageIcon size={28} /> : <FileStack size={28} />}</div>
-                  <h3>{activeFile ? "This format is not editable yet" : "Your canvas is ready"}</h3>
-                  <p>{activeFile ? "DOCX, PPTX and image previews are part of the upcoming Office and media tools." : "Import a PDF to preview and edit it here."}</p>
+                  <h3>{activeFile ? "Choose a PDF or convert this file" : "Your canvas is ready"}</h3>
+                  <p>{activeFile ? "Images can be converted locally. DOCX and PPTX conversion requires the secure LibreOffice worker connection." : "Import a PDF to preview and edit it here."}</p>
                   <label className="primary-button compact" htmlFor="editor-file-picker"><Upload size={15} /> Import files</label>
                 </div>}
               </div>
