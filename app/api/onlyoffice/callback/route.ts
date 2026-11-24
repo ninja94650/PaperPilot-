@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     contentType: row.mime_type || "application/octet-stream"
   });
   if (uploadError) return NextResponse.json({ error: 1, message: "Could not save the edited document." }, { status: 500 });
-  const { error: updateError } = await admin.from("documents").update({ file_size: bytes.byteLength }).eq("id", documentId);
+  const { error: updateError } = await admin.from("documents").update({ file_size: bytes.byteLength, updated_at: new Date().toISOString() }).eq("id", documentId);
   if (updateError) return NextResponse.json({ error: 1 }, { status: 500 });
   return NextResponse.json({ error: 0 });
 }
