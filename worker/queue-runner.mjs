@@ -99,11 +99,11 @@ export function convert(buffer, name, extension, signal) {
         "-env:UserInstallation=file://" + profileDir, "--headless", "--nologo",
         "--nodefault", "--nolockcheck", "--norestore", "--convert-to", "pdf",
         "--outdir", outputDir, inputPath
-      ], { cwd: outputDir, env: { ...process.env, HOME: profileDir, TMPDIR: outputDir }, stdio: ["ignore","ignore","pipe"] });
+      ], { cwd: outputDir, env: { ...process.env, HOME: profileDir, TMPDIR: outputDir }, stdio: ["ignore","ignore","pipe"], detached: process.platform !== "win32" });
       let stderr = "";
       child.stderr.on("data", chunk => { stderr = (stderr + chunk.toString()).slice(-2000); });
       timer = setTimeout(() => {
-        child?.kill("SIGKILL");
+        terminateProcessTree(child, "SIGKILL", process.kill, process.platform !== "win32");
         void finish(new Error("Office conversion exceeded its time limit."));
       }, timeoutMs);
       child.once("error", error => { void finish(error); });
