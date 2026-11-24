@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       status: "succeeded",
       output_metadata: { output_size_bytes: result.byteLength, mime_type: "application/pdf" },
       completed_at: new Date().toISOString()
-    }).eq("id", job.id).eq("owner_id", user.id);
+    }).eq("id", jobId).eq("owner_id", ownerId);
     if (updateError) return fail("The conversion finished but its history could not be saved. Please retry.", 500);
 
     const responseBody = new ArrayBuffer(result.byteLength);
