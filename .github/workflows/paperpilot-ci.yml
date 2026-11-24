@@ -46,3 +46,43 @@ jobs:
         run: npm run typecheck
       - name: Production build
         run: npm run build
+
+  database-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: paperpilot-ci
+          POSTGRES_DB: paperpilot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d paperpilot_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: paperpilot-ci
+      DATABASE_URL: postgresql://postgres:paperpilot-ci@localhost:5432/paperpilot_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Bootstrap isolated Supabase-compatible schema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap_disposable_postgres.sql
+      - name: Apply secure processing migrations
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124160750_paperpilot_secure_processing_pipeline.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124160930_paperpilot_processing_scan_leases.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124161225_paperpilot_scan_lease_exhaustion.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124161331_paperpilot_cancel_expired_processing_jobs.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124162518_paperpilot_processing_least_privilege_grants.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124163000_paperpilot_atomic_revision_publish.sql
+      - name: Execute cross-tenant RLS and expired-lease recovery fixture
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/processing_pipeline_rls_and_recovery.sql
