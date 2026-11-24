@@ -9,7 +9,7 @@ Evolve the current browser-based PDF foundation into a reliable document workspa
 ## Delivery sequence
 
 ### 0.2.0 — Foundation and dependency hygiene
-**Status: dependency baseline complete; regression coverage pending** — Next.js 16.4.6 and React 19.3.1 are pinned. Root and worker lockfiles are committed. Both npm audits report zero vulnerabilities. GitHub Actions typecheck and production build pass. PDF operation regression tests remain.
+**Status: dependency and CI baseline complete; product regression coverage pending** — Next.js 16.4.6 and React 19.3.1 are pinned. Root and worker lockfiles are committed and CI installs with `npm ci`. Both dependency audits currently report zero advisories; the CI audit steps fail on high/critical findings. The worker now has five built-in Node.js tests for Office extension/signature validation, all passing in CI. Typecheck and production build pass. PDF operation, authorization, and multi-file regression tests remain.
 - Add and commit the package manager lockfile; standardize the Node.js version used locally and in CI/Vercel.
 - Run a full dependency audit, update vulnerable direct/transitive packages, and document any accepted residual advisories.
 - Add CI checks for install from lockfile, typecheck, production build, and unit tests.
@@ -37,7 +37,7 @@ Evolve the current browser-based PDF foundation into a reliable document workspa
 **Exit criteria:** deterministic tests validate output readability, page count, size reporting, and graceful unsupported-file handling.
 
 ### 0.2.3 — Office conversion workers
-**Status: worker source and authenticated proxy added** — a hardened Docker/LibreOffice worker and processing-job tracking are in the branch. The worker still needs deployment and end-to-end DOC/DOCX/PPT/PPTX tests.
+**Status: worker source, bounded container configuration and authenticated proxy added** — The worker validates Office extensions/signatures, uses randomized temporary names, runs LibreOffice as non-root and enforces configured resource/time limits. Five unit tests cover the file-signature gate. The worker still needs private-network/egress controls, malware/CDR scanning, deployment and end-to-end DOC/DOCX/PPT/PPTX tests.
 - Add isolated LibreOffice workers for DOCX/PPTX to PDF and supported reverse conversions.
 - Run workers in non-root containers with CPU, memory, time, disk, and network limits.
 - Validate MIME type and file signatures; randomize temporary paths; enforce upload and output limits.
@@ -47,7 +47,7 @@ Evolve the current browser-based PDF foundation into a reliable document workspa
 **Exit criteria:** representative DOCX/PPTX fixtures convert correctly; worker isolation and cleanup tests pass.
 
 ### 0.2.4 — ONLYOFFICE editing
-**Status: integration bridge added** — signed config, authenticated document lookup and callback verification are implemented. Docs server URL, shared JWT secret, service-role key and edit-save-reopen testing remain external setup.
+**Status: integration bridge added; not production-approved** — Signed config, authenticated document lookup and callback verification are implemented. Docs server URL, shared JWT secret, service-role key, licence review, immutable revision handling and edit-save-reopen testing remain external gates. Do not deploy or enable a Docs server until a SaaS-compatible licence and ₹0 operating path are verified.
 - Integrate ONLYOFFICE Docs through its documented editor configuration and callback flow.
 - Keep document storage and editor callbacks behind authenticated server endpoints.
 - Use short-lived, document-scoped access tokens; validate callback signatures/tokens and permissions.
@@ -56,7 +56,7 @@ Evolve the current browser-based PDF foundation into a reliable document workspa
 **Exit criteria:** authenticated user can open, edit, save, and reopen an authorized test document; cross-user access is denied.
 
 ### 0.2.5 — Secure cloud processing
-**Status: Supabase storage and job metadata are connected in code** — private per-user bucket policies already exist; cloud uploads now show progress and use signed downloads. Lifecycle cleanup, malware scanning, queue workers and abuse-limit testing remain.
+**Status: Supabase storage and job metadata are connected in code** — private per-user bucket policies already exist; cloud uploads show progress and use signed downloads. Lifecycle cleanup, malware scanning, queue workers and abuse-limit testing remain.
 - Add private object storage with randomized object keys, encryption in transit/at rest, signed short-lived upload/download URLs, and lifecycle cleanup.
 - Add a job queue and worker status API; do not expose internal storage paths.
 - Enforce file size, page count, format, rate, concurrency, and retention limits.
@@ -86,7 +86,7 @@ Evolve the current browser-based PDF foundation into a reliable document workspa
 
 ## Required test matrix
 
-- Unit: page operations, compression settings, validation, authorization policy.
+- Unit: worker Office extension/signature validation (`worker/server.test.mjs`); page operations, compression settings, validation, authorization policy still pending.
 - Integration: upload -> queue -> worker -> storage -> download.
 - Security: IDOR/cross-user access, expired tokens, path traversal, oversized files, malformed inputs, callback forgery, rate limits.
 - Regression: merge, extraction, rotation, signature, multiple imports during editing.
@@ -94,4 +94,4 @@ Evolve the current browser-based PDF foundation into a reliable document workspa
 
 ## Explicitly not assumed complete
 
-Do not treat the preview branch as production-complete until the Vercel build passes and browser regression/security tests are run. LibreOffice conversion and ONLYOFFICE editing remain unavailable until their external services and secrets are configured. Compression is intentionally lossy rasterization; OCR exports text rather than adding a searchable PDF layer.
+Do not treat the preview branch as production-complete until the Vercel build passes and browser regression/security tests are run. LibreOffice conversion and ONLYOFFICE editing remain unavailable until their external services and secrets are configured. Compression is intentionally lossy rasterization; OCR exports text rather than adding a searchable PDF layer. The latest passing GitHub CI run does not replace the blocked Vercel preview or the required security/licence review.
