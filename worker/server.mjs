@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
 import { startQueueRunner } from "./queue-runner.mjs";
 
-const app = express();
+export const app = express();
 const port = Number(process.env.PORT || 8080);
 const token = process.env.DOCUMENT_WORKER_TOKEN || "";
 const maxFileBytes = 20 * 1024 * 1024;
