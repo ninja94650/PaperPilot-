@@ -173,6 +173,7 @@ async function processOne() {
   }, 25_000);
 
   try {
+    await call("/api/internal/processing/cleanup-outputs", { jobId: job.id, workerId, attempt: job.attempt });
     await beat(10, "Downloading private input");
     const bytes = await download(job.inputUrl, maxInputBytes);
     const name = typeof job.input?.file_name === "string" ? job.input.file_name : "document.docx";
@@ -212,6 +213,21 @@ async function processOne() {
   return true;
 }
 
+let lastOutputCleanupAt = 0;
+
+async function sweepOrphanedOutputs() {
+  if (Date.now() - lastOutputCleanupAt < 60_000) return;
+  lastOutputCleanupAt = Date.now();
+  try {
+    const result = await call("/api/internal/processing/cleanup-outputs", { limit: 50 });
+    if (result.removed || result.invalid || result.errors) {
+      process.stdout.write("PaperPilot output cleanup: " + JSON.stringify(result) + "\n");
+    }
+  } catch (error) {
+    process.stderr.write("PaperPilot output cleanup sweep failed: " + String(error).slice(0,180) + "\n");
+  }
+}
+
 export function startQueueRunner() {
   if (!api || !token || token.length < 32) {
     process.stdout.write("PaperPilot queue polling disabled; set PAPERPILOT_API_URL and DOCUMENT_WORKER_TOKEN.\n");
@@ -221,6 +237,7 @@ export function startQueueRunner() {
     if (stopped || busy) return;
     busy = true;
     try {
+      await sweepOrphanedOutputs();
       const scanned = await scanOne();
       if (!scanned) await processOne();
     } catch (error) {
