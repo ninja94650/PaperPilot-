@@ -1,0 +1,32 @@
+name: PaperPilot CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "feature/paperpilot-0.2-advanced-workspace"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+      - name: Install dependencies
+        run: npm install
+      - name: Report dependency advisories
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e 'const a=require("./npm-audit.json"); for (const [name,v] of Object.entries(a.vulnerabilities||{})) console.log(v.severity.toUpperCase()+" "+name+": direct="+v.isDirect+"; range="+v.range+"; fix="+JSON.stringify(v.fixAvailable)); console.log("Audit totals:", JSON.stringify(a.metadata?.vulnerabilities||{}));'
+      - name: Type check
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
