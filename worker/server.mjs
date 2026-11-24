@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, extname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { validateOOXMLArchive } from "./archive-validation.mjs";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -30,7 +31,7 @@ function secureTokenEqual(value) {
 
 function authorize(req, res, next) {
   const authorization = req.get("authorization") || "";
-  const supplied = authorization.replace(/^Bearer\s+/i, "");
+  const supplied = authorization.replace(/^Bearer\\s+/i, "");
   if (!secureTokenEqual(supplied)) return res.status(401).json({ error: "Unauthorized worker request." });
   next();
 }
@@ -64,6 +65,9 @@ export function validateFile(file) {
   const isOle = header.equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
   const modern = extension === ".docx" || extension === ".pptx";
   if ((modern && !isZip) || (!modern && !isOle)) throw new Error("The file signature does not match its Office extension.");
+  if (modern) {
+    validateOOXMLArchive(file.buffer, extension === ".docx" ? "word/document.xml" : "ppt/presentation.xml");
+  }
   return extension;
 }
 
@@ -127,7 +131,7 @@ app.post("/convert", authorize, reserveJob, parseUpload, async (req, res) => {
     }).send(pdf);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Conversion failed.";
-    const status = /signature|supported|size|field/i.test(message) ? 415 : 500;
+    const status = /signature|supported|size|field|package|archive|ZIP/i.test(message) ? 415 : 500;
     if (!res.headersSent) res.status(status).json({ error: message });
   } finally {
     activeJobs = Math.max(0, activeJobs - 1);
@@ -145,7 +149,7 @@ export function startServer() {
     throw new Error("DOCUMENT_WORKER_TOKEN must be set to a random secret of at least 32 characters.");
   }
   return app.listen(port, "0.0.0.0", () => {
-    process.stdout.write("PaperPilot conversion worker listening on " + port + "\n");
+    process.stdout.write("PaperPilot conversion worker listening on " + port + "\\n");
   });
 }
 
