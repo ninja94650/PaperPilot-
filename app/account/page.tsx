@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import CloudDocuments from "@/components/cloud-documents";
+import CloudDocuments from "@/components/cloud-documents";
 
 export default async function AccountPage() {
   const supabase = await createClient();
