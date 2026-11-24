@@ -86,3 +86,46 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124163000_paperpilot_atomic_revision_publish.sql
       - name: Execute cross-tenant RLS and expired-lease recovery fixture
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/processing_pipeline_rls_and_recovery.sql
+
+  clamav-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      clamav:
+        image: clamav/clamav:1.4
+        ports:
+          - 3310:3310
+    env:
+      CLAMAV_INTEGRATION: "1"
+      CLAMAV_HOST: 127.0.0.1
+      CLAMAV_PORT: "3310"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - name: Install worker dependencies from lockfile
+        run: npm ci --prefix worker
+      - name: Wait for ClamAV and its loaded signature database
+        run: |
+          node --input-type=module <<'NODE'
+          import { getClamAvVersion } from "./worker/clamav.mjs";
+          const deadline = Date.now() + 300000;
+          let lastError;
+          while (Date.now() < deadline) {
+            try {
+              const version = await getClamAvVersion({ host: process.env.CLAMAV_HOST, port: Number(process.env.CLAMAV_PORT) });
+              console.log("ClamAV ready:", version);
+              process.exit(0);
+            } catch (error) {
+              lastError = error;
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+          }
+          console.error("ClamAV did not become ready:", lastError);
+          process.exit(1);
+          NODE
+      - name: Run live EICAR detection and clean-PDF scanner tests
+        run: npm --prefix worker test
