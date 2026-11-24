@@ -1,11 +1,7 @@
 import express from "express";
-import multer from "multer";
-import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, extname } from "node:path";
+import { extname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
 import { startQueueRunner } from "./queue-runner.mjs";
 
@@ -13,46 +9,12 @@ const app = express();
 const port = Number(process.env.PORT || 8080);
 const token = process.env.DOCUMENT_WORKER_TOKEN || "";
 const maxFileBytes = 20 * 1024 * 1024;
-const maxOutputBytes = 40 * 1024 * 1024;
-const maxConcurrentJobs = Number(process.env.MAX_CONCURRENT_JOBS || 2);
-const timeoutMs = Number(process.env.CONVERSION_TIMEOUT_MS || 90_000);
-let activeJobs = 0;
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: maxFileBytes, files: 1, fields: 2 }
-});
 
 function secureTokenEqual(value) {
   if (typeof value !== "string") return false;
   const left = Buffer.from(value);
   const right = Buffer.from(token);
   return left.length === right.length && timingSafeEqual(left, right);
-}
-
-function authorize(req, res, next) {
-  const authorization = req.get("authorization") || "";
-  const supplied = authorization.replace(/^Bearer\\s+/i, "");
-  if (!secureTokenEqual(supplied)) return res.status(401).json({ error: "Unauthorized worker request." });
-  next();
-}
-
-function reserveJob(req, res, next) {
-  if (activeJobs >= maxConcurrentJobs) return res.status(429).json({ error: "The conversion queue is busy. Retry shortly." });
-  activeJobs += 1;
-  req.paperPilotJobReserved = true;
-  next();
-}
-
-function parseUpload(req, res, next) {
-  upload.single("file")(req, res, (error) => {
-    if (error) {
-      if (req.paperPilotJobReserved) activeJobs = Math.max(0, activeJobs - 1);
-      req.paperPilotJobReserved = false;
-      return next(error);
-    }
-    next();
-  });
 }
 
 export function validateFile(file) {
@@ -103,46 +65,8 @@ function runLibreOffice(inputPath, outputDir, profileDir) {
 
 app.get("/healthz", (_req, res) => res.json({ ok: true, service: "paperpilot-converter" }));
 
-app.post("/convert", authorize, reserveJob, parseUpload, async (req, res) => {
-  let jobDir;
-  try {
-    if (!req.file) return res.status(400).json({ error: "Multipart file field 'file' is required." });
-    const extension = validateFile(req.file);
-    jobDir = await mkdtemp(join(tmpdir(), "paperpilot-"));
-    const inputDir = join(jobDir, "input");
-    const outputDir = join(jobDir, "output");
-    const profileDir = join(jobDir, "profile");
-    await Promise.all([mkdir(inputDir), mkdir(outputDir), mkdir(profileDir)]);
-    const base = randomUUID();
-    const inputPath = join(inputDir, base + extension);
-    const outputPath = join(outputDir, base + ".pdf");
-    await writeFile(inputPath, req.file.buffer, { flag: "wx", mode: 0o600 });
-
-    await runLibreOffice(inputPath, outputDir, profileDir);
-    const pdf = await readFile(outputPath);
-    if (pdf.length < 5 || pdf.length > maxOutputBytes || pdf.subarray(0, 5).toString("ascii") !== "%PDF-") {
-      throw new Error("LibreOffice returned an invalid or oversized PDF.");
-    }
-
-    res.status(200).set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": 'attachment; filename="paperpilot-converted.pdf"',
-      "Cache-Control": "no-store",
-      "Content-Length": String(pdf.length)
-    }).send(pdf);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Conversion failed.";
-    const status = /signature|supported|size|field|package|archive|ZIP/i.test(message) ? 415 : 500;
-    if (!res.headersSent) res.status(status).json({ error: message });
-  } finally {
-    activeJobs = Math.max(0, activeJobs - 1);
-    if (jobDir) await rm(jobDir, { recursive: true, force: true }).catch(() => {});
-  }
-});
-
-app.use((error, _req, res, _next) => {
-  const status = error?.code === "LIMIT_FILE_SIZE" ? 413 : 400;
-  res.status(status).json({ error: status === 413 ? "Files must be 20 MB or smaller." : "The multipart upload is invalid." });
+app.post("/convert", (_req, res) => {
+  res.status(410).json({ error: "Synchronous conversion is retired. Submit an authenticated processing job through PaperPilot." });
 });
 
 export function startServer() {
