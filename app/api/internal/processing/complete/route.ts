@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "The worker lease is no longer valid." }, { status: 409 });
   }
   if (!job.document_id || !storagePath.startsWith(job.owner_id + "/" + job.id + "/")
-    || !new RegExp("^" + job.owner_id + "/" + job.id + "/[0-9a-f-]{36}/result\\.pdf$").test(storagePath)) {
+    || !new RegExp("^" + job.owner_id + "/" + job.id + "/attempt-" + attempt + "/result\\.pdf$").test(storagePath)) {
     return NextResponse.json({ error: "The output path is not scoped to this job and owner." }, { status: 403 });
   }
 
