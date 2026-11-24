@@ -163,7 +163,7 @@ async function processOne() {
     });
     const uploaded = await fetch(upload.signedUrl, {
       method: "PUT",
-      headers: { "Content-Type": "application/pdf", "x-upsert": "false", "cache-control": "3600" },
+      headers: { "Content-Type": "application/pdf", "x-upsert": "false", "cache-control": "max-age=3600" },
       body: pdf,
       cache: "no-store",
       signal: AbortSignal.timeout(90_000)
