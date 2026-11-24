@@ -9,7 +9,7 @@ Evolve the current browser-based PDF foundation into a reliable document workspa
 ## Delivery sequence
 
 ### 0.2.0 — Foundation and dependency hygiene
-**Status: partial** — Next.js is pinned to 15.5.29 and the Supabase project/env wiring exists. A committed lockfile, full dependency audit/remediation, CI baseline and PDF regression tests are still required.
+**Status: dependency baseline complete; regression coverage pending** — Next.js 16.4.6 and React 19.3.1 are pinned. Root and worker lockfiles are committed. Both npm audits report zero vulnerabilities. GitHub Actions typecheck and production build pass. PDF operation regression tests remain.
 - Add and commit the package manager lockfile; standardize the Node.js version used locally and in CI/Vercel.
 - Run a full dependency audit, update vulnerable direct/transitive packages, and document any accepted residual advisories.
 - Add CI checks for install from lockfile, typecheck, production build, and unit tests.
