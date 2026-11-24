@@ -1,12 +1,29 @@
 services:
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    expose:
+      - "3310"
+    volumes:
+      - clamav-db:/var/lib/clamav
+    mem_limit: 1g
+    cpus: 1
+    pids_limit: 100
+    security_opt:
+      - no-new-privileges:true
+
   paperpilot-converter:
     build: .
     restart: unless-stopped
+    depends_on:
+      - clamav
     environment:
       PORT: "8080"
       DOCUMENT_WORKER_TOKEN: ${DOCUMENT_WORKER_TOKEN:?Set a long random token}
       MAX_CONCURRENT_JOBS: "2"
       CONVERSION_TIMEOUT_MS: "90000"
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
     ports:
       - "8080:8080"
     read_only: true
@@ -20,3 +37,6 @@ services:
     cap_drop:
       - ALL
     init: true
+
+volumes:
+  clamav-db:
