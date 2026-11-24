@@ -146,3 +146,15 @@ a{color:inherit;text-decoration:none}
 .pp-tool-secondary{background:#f1f5f1;color:#637268}
 .pp-tool-primary:disabled{opacity:.5}
 @media(max-width:700px){.pp-pdf-workspace{grid-template-columns:105px minmax(0,1fr)}.pp-page-thumbnails{padding:6px}.pp-page-controls{gap:2px}.pp-page-controls button{width:21px;height:20px}.pp-page-canvas-scroll{padding:5px}.pp-page-canvas-meta{font-size:7px}}
+
+.onlyoffice-launch{border:1px solid #dfe9e0;border-radius:7px;background:#f5faf6;color:#4b8a61;padding:7px 9px;font-size:9px;font-weight:800;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.onlyoffice-launch:disabled{opacity:.55}
+.onlyoffice-error{font-size:8px;color:#b65e55;max-width:130px}
+.onlyoffice-backdrop{position:fixed;inset:0;z-index:100;background:rgba(11,24,16,.68);backdrop-filter:blur(7px);display:grid;place-items:center;padding:18px}
+.onlyoffice-window{width:min(1440px,100%);height:min(900px,calc(100vh - 36px));background:white;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 90px rgba(0,0,0,.32)}
+.onlyoffice-window>header{height:48px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 15px;border-bottom:1px solid #e9eee9;color:#405447;font-size:11px}
+.onlyoffice-window>header button{border:0;background:transparent;color:#829087}
+.onlyoffice-frame{position:relative;flex:1;min-height:0}
+.onlyoffice-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:9px;color:#588c67;font-size:11px}
+.header-actions .text-button{text-decoration:none;display:inline-flex;align-items:center}
+@media(max-width:700px){.onlyoffice-backdrop{padding:0}.onlyoffice-window{height:100dvh;border-radius:0}}
