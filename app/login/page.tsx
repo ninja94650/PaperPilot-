@@ -41,7 +41,7 @@ export default function LoginPage() {
         setMessage(data.session ? "Your account is ready. Redirecting…" : "Check your email to confirm your account, then sign in.");
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin + "/auth/callback?next=/account"
+          redirectTo: window.location.origin + "/auth/callback?next=/update-password"
         });
         if (error) throw error;
         setMessage("If an account exists for that address, a password reset link has been sent.");
