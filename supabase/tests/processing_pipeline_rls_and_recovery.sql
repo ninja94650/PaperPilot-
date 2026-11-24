@@ -86,7 +86,7 @@ insert into paperpilot_rate_limit_results(owner_label,allowed,remaining,retry_af
 select 'owner-a', result.allowed, result.remaining, result.retry_after_seconds
 from generate_series(1,11) as attempt(n)
 cross join lateral public.consume_processing_api_rate_limit('job:create') as result;
-do $
+do $$
 begin
   begin
     insert into storage.objects(bucket_id,name)
