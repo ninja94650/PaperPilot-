@@ -54,16 +54,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 1, message: "Could not retrieve the saved document from ONLYOFFICE." }, { status: 502 });
   }
   if (!downloaded.ok) return NextResponse.json({ error: 1 }, { status: 502 });
-  const bytes = await downloaded.arrayBuffer();
-  if (bytes.byteLength < 8 || bytes.byteLength > 20 * 1024 * 1024) return NextResponse.json({ error: 1, message: "Saved document size is invalid." }, { status: 413 });
-  const signature = new Uint8Array(bytes.slice(0, 8));
+  const declaredSize = Number(downloaded.headers.get("content-length") || 0);
+  if (declaredSize > 20 * 1024 * 1024) return NextResponse.json({ error: 1, message: "Saved document size is invalid." }, { status: 413 });
+  const reader = downloaded.body?.getReader();
+  if (!reader) return NextResponse.json({ error: 1, message: "The editor returned an empty document stream." }, { status: 502 });
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > 20 * 1024 * 1024) {
+      await reader.cancel();
+      return NextResponse.json({ error: 1, message: "Saved document exceeds the 20 MB limit." }, { status: 413 });
+    }
+    chunks.push(value);
+  }
+  if (totalBytes < 8) return NextResponse.json({ error: 1, message: "Saved document size is invalid." }, { status: 413 });
+  const bytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+  const signature = bytes.subarray(0, 8);
   const zip = signature[0] === 0x50 && signature[1] === 0x4b;
   const ole = signature[0] === 0xd0 && signature[1] === 0xcf && signature[2] === 0x11 && signature[3] === 0xe0;
   if (!zip && !ole) return NextResponse.json({ error: 1, message: "Saved Office file signature was invalid." }, { status: 415 });
 
   const admin = createAdminClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: row, error: rowError } = await admin.from("documents").select("id,object_path,mime_type").eq("id", documentId).single();
+  const { data: row, error: rowError } = await admin.from("documents").select("id,object_path,mime_type,file_name").eq("id", documentId).single();
   if (rowError || !row) return NextResponse.json({ error: 1 }, { status: 404 });
+  const extension = row.file_name.split(".").pop()?.toLowerCase();
+  const expectsZip = extension === "docx" || extension === "pptx";
+  if ((expectsZip && !zip) || (!expectsZip && !ole)) return NextResponse.json({ error: 1, message: "Saved Office file type did not match the stored document." }, { status: 415 });
   const { error: uploadError } = await admin.storage.from("paperpilot-documents").upload(row.object_path, bytes, {
     upsert: true,
     contentType: row.mime_type || "application/octet-stream"
