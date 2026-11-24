@@ -30,7 +30,7 @@ function secureTokenEqual(value) {
 
 function authorize(req, res, next) {
   const authorization = req.get("authorization") || "";
-  const supplied = authorization.replace(/^Bearer\\s+/i, "");
+  const supplied = authorization.replace(/^Bearer\s+/i, "");
   if (!secureTokenEqual(supplied)) return res.status(401).json({ error: "Unauthorized worker request." });
   next();
 }
@@ -145,7 +145,7 @@ export function startServer() {
     throw new Error("DOCUMENT_WORKER_TOKEN must be set to a random secret of at least 32 characters.");
   }
   return app.listen(port, "0.0.0.0", () => {
-    process.stdout.write("PaperPilot conversion worker listening on " + port + "\\n");
+    process.stdout.write("PaperPilot conversion worker listening on " + port + "\n");
   });
 }
 
