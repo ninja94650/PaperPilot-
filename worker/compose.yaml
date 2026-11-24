@@ -24,6 +24,8 @@ services:
       CONVERSION_TIMEOUT_MS: "90000"
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
+      PAPERPILOT_API_URL: ${PAPERPILOT_API_URL:-}
+      PAPERPILOT_WORKER_ID: ${PAPERPILOT_WORKER_ID:-office-worker-1}
     ports:
       - "8080:8080"
     read_only: true
