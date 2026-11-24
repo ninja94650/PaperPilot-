@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, "feature/paperpilot-0.2-advanced-workspace"]
+    branches: [main]
 
 permissions:
   contents: read
