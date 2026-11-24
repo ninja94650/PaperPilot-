@@ -11,7 +11,7 @@ The queue is PostgreSQL-backed. Supabase is the source of truth; workers poll th
 | POST | /api/processing/jobs/{id}/cancel | Immediate queued cancellation or cooperative running cancellation |
 | GET | /api/processing/jobs/{id}/download | Short-lived signed download for a published immutable revision |
 
-All user routes verify the Supabase user. The job and revision/event tables enforce owner-scoped RLS. Authenticated users cannot directly insert, update or delete queue rows; job mutations go through server routes.
+All user routes verify the Supabase user. The job and revision/event tables enforce owner-scoped RLS. Authenticated users have SELECT only; anon has no table privileges. Authenticated users cannot directly insert, update or delete queue rows; job mutations go through server routes.
 
 ## Internal worker API
 
@@ -34,7 +34,7 @@ Every internal route requires Authorization: Bearer DOCUMENT_WORKER_TOKEN. Compa
 - ClamAV runs as a separate container on the private Compose network at TCP port 3310. Do not publish this port: ClamD TCP is unencrypted.
 - The worker claims jobs with Postgres row locking and a bounded lease. Expired leases are reclaimable; exhausted attempts fail closed.
 - Default processing retry budget is 3 attempts with exponential backoff capped at 15 minutes. Scan attempts are capped at 3.
-- Heartbeat renews the lease. Cancellation is cooperative at stage boundaries; hard process termination remains an orchestrator responsibility.
+- Heartbeat renews the lease. Cancellation and lease loss abort active work; on Linux, LibreOffice runs in a detached process group so cancellation and timeout terminate its complete process tree, not only the launcher.
 - Input URLs are short-lived signed URLs. Output keys are random, private, and attempt-specific. The original object is not overwritten.
 - Output revisions are immutable and have per-document monotonically increasing version numbers. A row-locked Postgres RPC publishes the revision, finalizes the job and records the completion event in one transaction; retries return the same revision. Users receive signed download links only after success.
 - Supported queued tool in this increment: DOC/DOCX/PPT/PPTX to PDF. Other tools remain browser-local or unavailable until their worker implementation is added.
