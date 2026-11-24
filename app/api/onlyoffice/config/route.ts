@@ -16,7 +16,7 @@ function signJwt(payload: Record<string, unknown>, secret: string) {
 export async function GET(request: Request) {
   const serverUrl = process.env.ONLYOFFICE_DOCUMENT_SERVER_URL?.replace(/\/+$/, "");
   const secret = process.env.ONLYOFFICE_JWT_SECRET;
-  if (!serverUrl || !secret) {
+  if (!serverUrl || !secret || secret.length < 32) {
     return NextResponse.json({ error: "ONLYOFFICE Docs is not configured for this deployment." }, { status: 503 });
   }
 
