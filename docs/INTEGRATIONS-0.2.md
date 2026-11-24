@@ -28,7 +28,7 @@ Set server-only Vercel variables:
 
 PaperPilot calls \`POST {DOCUMENT_WORKER_URL}/convert\` with multipart field \`file\` and an Authorization bearer token. The worker must return a PDF with a valid \`%PDF-\` signature. It must run LibreOffice in a non-root container with network egress disabled, resource/time limits, temporary-directory isolation, input validation and guaranteed cleanup.
 
-The Vercel route requires an authenticated PaperPilot user, limits uploads to 20 MB, validates extensions, applies a timeout, and validates the returned PDF signature. The worker itself still needs to be deployed and hardened before Office conversion is available in production.
+The Vercel route requires an authenticated PaperPilot user, limits uploads to 20 MB, validates extensions, applies a timeout, and validates the returned PDF signature. A ready-to-build Docker worker is included in [`worker/`](../worker/README.md). The worker itself still needs to be deployed behind HTTPS and hardened before Office conversion is available in production.
 
 ## ONLYOFFICE Docs
 
