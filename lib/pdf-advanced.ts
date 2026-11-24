@@ -6,7 +6,7 @@ GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", i
 
 export type PdfPageSource = PDFDocumentProxy;
 
-export async function loadPdfForWorkspace(file: File): Promise<PdfDocumentProxy> {
+export async function loadPdfForWorkspace(file: File): Promise<PDFDocumentProxy> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   return getDocument({ data: bytes }).promise;
 }
