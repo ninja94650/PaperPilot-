@@ -13,7 +13,7 @@ Implemented in source and linked Supabase schema:
 - Authenticated users can select their own jobs but cannot directly insert/update/delete queue records.
 
 Remaining:
-- Verify all transitions with automated database integration tests, including simultaneous claims and cancellation/claim races.
+- Disposable PostgreSQL CI regression now verifies owner A/B visibility for jobs, events and revisions, plus expired processing lease reclamation. Simultaneous claim races and cancellation/claim races still need dedicated concurrent tests.
 - Add operator-visible DLQ/re-drive controls only after authorization and audit design.
 
 ## Phase 2 — Security inspection and quarantine gate
@@ -27,8 +27,8 @@ Implemented in source:
 - ClamAV TCP is internal-only; its database volume persists across restarts.
 
 Remaining:
-- Test against the official EICAR test file and real synthetic DOCX/PPTX fixtures in an isolated environment.
-- Verify signature freshness and ClamAV startup/health behavior.
+- Live ClamAV CI job passed against the official EICAR test string and a harmless synthetic PDF. Freshclam updated the daily database in the isolated test container; the scanner reached healthy state before scanning.
+- Continue monitoring signature freshness and scanner startup/health in a deployed environment.
 - Add CDR or an explicit decision to reject higher-risk content; antivirus scanning alone is not CDR.
 
 ## Phase 3 — Isolated Office worker and private storage
@@ -44,7 +44,7 @@ Implemented in source:
 
 Remaining:
 - Deploy only on a private/self-hosted environment with verified outbound egress restrictions, HTTPS API boundary, host firewall, rate limits and resource enforcement.
-- Validate image build and end-to-end conversion for DOC, DOCX, PPT and PPTX.
+- Validate image build and end-to-end conversion for DOC, DOCX, PPT and PPTX. Current tests validate archive signatures and conversion cancellation, not complete real Office-to-PDF output for all four formats.
 - Verify storage cleanup on every failure and cancellation path.
 
 ## Phase 4 — Progress, cancellation and recovery
@@ -57,9 +57,9 @@ Implemented in source:
 - Download endpoint only issues short-lived links for completed immutable revisions.
 
 Remaining:
-- CI run #126 passed Linux process-group cancellation integration: cancelling the detached worker also terminated a spawned descendant. The test is Linux-only; Windows process-tree termination remains a separate platform consideration.
-- Run the opt-in live ClamAV integration suite with fresh signatures (`CLAMAV_INTEGRATION=1`) in an isolated environment. The EICAR fixture is harmless test content; skipped integration tests are not a live scanner pass.
-- Exercise worker crash, retry delay, duplicate delivery and concurrent publication in a disposable Supabase environment.
+- CI run #138 passed Linux process-group cancellation integration: cancelling the detached worker also terminated a spawned descendant. The test is Linux-only; Windows process-tree termination remains a separate platform consideration.
+- Live ClamAV EICAR detection and clean-PDF scan passed in CI run #138; all 26 worker tests passed with zero skips.
+- Disposable PostgreSQL CI fixture passed expired processing-lease recovery. Worker crash, retry delay, duplicate delivery and concurrent publication still need dedicated end-to-end tests.
 - Add SSE/realtime only if polling becomes insufficient; status GET remains the reconnect/recovery source of truth.
 
 ## Phase 5 — Security, observability and release gates
