@@ -37,6 +37,8 @@ jobs:
       - name: Audit worker dependencies
         working-directory: worker
         run: npm audit --audit-level=high
+      - name: API ownership and IDOR regression tests
+        run: npm run test:security
       - name: Worker input validation tests
         working-directory: worker
         run: npm test
