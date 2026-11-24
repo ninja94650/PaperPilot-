@@ -55,6 +55,7 @@ Implemented in source:
 - Owner-scoped status/event endpoint and polling UI.
 - Worker heartbeats extend leases and report progress.
 - Queued cancellation is immediate; running cancellation is cooperative at worker stage boundaries.
+- Worker now asks the internal API to remove prior-attempt output objects after a retry claim and periodically sweeps private outputs belonging to queued, failed, cancelled or long-expired jobs. Cleanup validates the exact owner/job/attempt path, preserves active current-attempt outputs, and applies a five-minute grace to expired leases. The worker logs aggregate cleanup counts without exposing storage paths.
 - Worker failure API records retry/final failure; lease expiry permits recovery.
 - Download endpoint only issues short-lived links for completed immutable revisions.
 
@@ -83,6 +84,7 @@ Remaining before public use:
 - Added rollback-only SQL regression fixture `supabase/tests/processing_pipeline_rls_and_recovery.sql` covering owner A/B visibility for jobs, events and revisions plus expired processing-lease reclamation. It has been schema-reviewed and corrected to use the event ID sequence, but must run against a disposable Supabase database before release. Do not run it against production.
 - HTTP-level cross-user/IDOR tests for every API route and storage object remain.
 - Callback-forgery and malformed input regression tests.
+- Added 7 output-cleanup classifier tests for current attempt preservation, retry cleanup, terminal jobs, lease grace, foreign paths and future-attempt path rejection. Root security suite now has 11 passing tests.
 - Added opt-in live ClamAV EICAR and clean-PDF integration fixtures in `worker/clamav.integration.test.mjs`; not executed against a live scanner yet.
 - GitHub Actions run #126 passed on feature head `7562c9f0195b45eccfe846d18d26e6293c8b6416`: 24 worker tests passed, 2 opt-in live ClamAV tests skipped, both dependency audits reported zero vulnerabilities, TypeScript typecheck passed and Next.js production build passed.
 - Host-level rate limiting, egress controls, metrics/alerts, log redaction, retention cleanup and backup/restore verification.
