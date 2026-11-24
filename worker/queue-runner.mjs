@@ -168,7 +168,7 @@ async function processOne() {
       cache: "no-store",
       signal: AbortSignal.timeout(90_000)
     });
-    if (!uploaded.ok) throw new Error("Private output upload failed with status " + uploaded.status + ".");
+    if (!uploaded.ok && uploaded.status !== 409) throw new Error("Private output upload failed with status " + uploaded.status + ".");
     await call("/api/internal/processing/complete", {
       jobId: job.id, workerId, attempt: job.attempt,
       storagePath: upload.storagePath, sizeBytes: pdf.byteLength
