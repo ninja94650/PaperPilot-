@@ -133,3 +133,18 @@ test("rejects ZIP64 directory metadata", () => {
   archive.writeUInt16LE(0xffff, endOffset + 10);
   assert.throws(() => validateOOXMLArchive(archive, "word/document.xml"), /ZIP64/i);
 });
+
+test("rejects encrypted ZIP entries", () => {
+  const archive = makeZip(docxEntries);
+  const endOffset = archive.length - 22;
+  const centralOffset = archive.readUInt32LE(endOffset + 16);
+  archive.writeUInt16LE(0x0001, 6);
+  archive.writeUInt16LE(0x0001, centralOffset + 8);
+  assert.throws(() => validateOOXMLArchive(archive, "word/document.xml"), /Encrypted or unsupported ZIP flags/i);
+});
+
+test("rejects mismatched local and central directory metadata", () => {
+  const archive = makeZip(docxEntries);
+  archive.writeUInt32LE(123, 14);
+  assert.throws(() => validateOOXMLArchive(archive, "word/document.xml"), /metadata do not match/i);
+});
