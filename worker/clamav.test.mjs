@@ -3,44 +3,69 @@ import assert from "node:assert/strict";
 import net from "node:net";
 import { scanWithClamAv } from "./clamav.mjs";
 
-async function fakeClamAv(scanResponse) {
+async function withClamAv(scanResponse, run) {
   const server = net.createServer((socket) => {
-    let command = "";
+    let buffer = Buffer.alloc(0);
+    let mode = "command";
     socket.on("data", (chunk) => {
-      if (!command) {
-        command = chunk.subarray(0, Math.min(chunk.length, 20)).toString("utf8");
-        if (command.startsWith("zVERSION")) {
-          socket.end(Buffer.from("ClamAV 1.4.2/123/Fri Nov 20 00:00:00 2026\0"));
+      buffer = Buffer.concat([buffer, chunk]);
+      if (mode === "command") {
+        const end = buffer.indexOf(0);
+        if (end < 0) return;
+        const command = buffer.subarray(0, end).toString("utf8");
+        buffer = buffer.subarray(end + 1);
+        if (command === "zVERSION") {
+          socket.end("ClamAV 1.4.0/test\0");
+          return;
+        }
+        if (command !== "zINSTREAM") {
+          socket.end("UNKNOWN COMMAND\0");
+          return;
+        }
+        mode = "stream";
+      }
+      if (mode === "stream") {
+        while (buffer.length >= 4) {
+          const size = buffer.readUInt32BE(0);
+          if (buffer.length < size + 4) return;
+          buffer = buffer.subarray(4 + size);
+          if (size === 0) {
+            socket.end(scanResponse + "\0");
+            return;
+          }
         }
       }
-    });
-    socket.on("end", () => {
-      if (command.startsWith("zINSTREAM")) socket.end(Buffer.from(scanResponse + "\0"));
     });
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  return { host: "127.0.0.1", port: address.port, close: () => new Promise((resolve) => server.close(resolve)) };
+  try { await run({ host: "127.0.0.1", port: address.port }); }
+  finally { await new Promise((resolve) => server.close(resolve)); }
 }
 
-test("ClamAV client accepts a clean stream and returns signature version", async () => {
-  const fake = await fakeClamAv("stream: OK");
-  try {
-    const result = await scanWithClamAv(Buffer.from("safe synthetic document"), fake);
+test("ClamAV reports a clean streamed document with scanner version", async () => {
+  await withClamAv("stream: OK", async (endpoint) => {
+    const result = await scanWithClamAv(Buffer.from("%PDF-1.7"), endpoint);
     assert.equal(result.clean, true);
-    assert.match(result.signatureVersion, /^ClamAV 1\.4\.2/);
-  } finally { await fake.close(); }
+    assert.equal(result.signatureVersion, "ClamAV 1.4.0/test");
+  });
 });
 
-test("ClamAV client rejects a stream reported as infected", async () => {
-  const fake = await fakeClamAv("stream: Eicar-Test-Signature FOUND");
-  try {
-    const result = await scanWithClamAv(Buffer.from("synthetic test payload"), fake);
+test("ClamAV reports an infected document as rejected, not clean", async () => {
+  await withClamAv("stream: Eicar-Test-Signature FOUND", async (endpoint) => {
+    const result = await scanWithClamAv(Buffer.from("EICAR"), endpoint);
     assert.equal(result.clean, false);
     assert.match(result.threat, /FOUND/);
-  } finally { await fake.close(); }
+  });
 });
 
-test("ClamAV client rejects empty or oversized inputs before connecting", async () => {
-  await assert.rejects(() => scanWithClamAv(Buffer.alloc(0), { host: "127.0.0.1", port: 1 }), /size is invalid/);
+test("ClamAV protocol errors fail closed", async () => {
+  await withClamAv("stream: ERROR", async (endpoint) => {
+    await assert.rejects(scanWithClamAv(Buffer.from("file"), endpoint), /could not complete/i);
+  });
+});
+
+test("ClamAV rejects empty and oversized scan inputs before connecting", async () => {
+  await assert.rejects(scanWithClamAv(Buffer.alloc(0), { host: "127.0.0.1", port: 1 }), /size is invalid/i);
+  await assert.rejects(scanWithClamAv(Buffer.alloc(40 * 1024 * 1024 + 1), { host: "127.0.0.1", port: 1 }), /size is invalid/i);
 });
