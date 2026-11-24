@@ -130,6 +130,7 @@ test("rejects extreme ZIP compression ratios", () => {
 test("rejects ZIP64 directory metadata", () => {
   const archive = makeZip(docxEntries);
   const endOffset = archive.length - 22;
+  archive.writeUInt16LE(0xffff, endOffset + 8);
   archive.writeUInt16LE(0xffff, endOffset + 10);
   assert.throws(() => validateOOXMLArchive(archive, "word/document.xml"), /ZIP64/i);
 });
