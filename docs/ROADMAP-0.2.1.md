@@ -34,7 +34,7 @@ Remaining:
 ## Phase 3 — Isolated Office worker and private storage
 
 Implemented in source:
-- Worker polls scan and processing queues through bearer-authenticated internal APIs.
+- Worker polls scan and processing queues through bearer-authenticated internal APIs. The legacy synchronous worker /convert endpoint now returns HTTP 410, and the Compose host binding is localhost-only so the old unscanned path cannot bypass the queue.
 - Signed URLs are short-lived; the worker does not receive a Supabase service-role key.
 - OOXML archive bounds and Office file signature checks run before LibreOffice.
 - LibreOffice uses per-job random temporary paths/profile, non-root container, time/output limits and cleanup.
@@ -57,7 +57,7 @@ Implemented in source:
 - Download endpoint only issues short-lived links for completed immutable revisions.
 
 Remaining:
-- Add integration tests for worker crash, expired lease, retry delay, cancellation during LibreOffice, duplicate delivery and concurrent publication. ClamAV protocol unit tests now cover clean, infected, protocol-error and invalid-size outcomes.
+- ClamAV protocol tests cover clean, infected, protocol-error and invalid-size cases; worker HTTP regression tests confirm the retired synchronous endpoint returns HTTP 410. Add integration tests for worker crash, expired lease, retry delay, cancellation during LibreOffice, duplicate delivery and concurrent publication. ClamAV protocol unit tests now cover clean, infected, protocol-error and invalid-size outcomes.
 - Add SSE/realtime only if polling becomes insufficient; status GET remains the reconnect/recovery source of truth.
 
 ## Phase 5 — Security, observability and release gates
