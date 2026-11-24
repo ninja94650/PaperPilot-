@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   let admin;
   try { admin = createAdminClient(); }
   catch { return NextResponse.json({ error: "Worker queue is not configured." }, { status: 503 }); }
-  const { data: current } = await admin.from("processing_jobs").select("owner_id,attempt_count,status,worker_id")
+  const { data: current } = await admin.from("processing_jobs").select("owner_id,attempt_count,status,worker_id,output_storage_path")
     .eq("id", jobId).maybeSingle();
   if (!current || current.status !== "running" || current.worker_id !== workerId || current.attempt_count !== attempt) {
     return NextResponse.json({ error: "The worker lease is no longer valid." }, { status: 409 });
@@ -32,6 +32,11 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: "Could not finalize the failed attempt." }, { status: 500 });
   const job = Array.isArray(data) ? data[0] : data;
   if (!job) return NextResponse.json({ error: "The worker lease expired before failure was recorded." }, { status: 409 });
+  if (current.output_storage_path && current.output_storage_path.startsWith(current.owner_id + "/" + jobId + "/")) {
+    await admin.storage.from("documents").remove([current.output_storage_path]);
+    await admin.from("processing_jobs").update({ output_storage_path: null, output_metadata: {} })
+      .eq("id", jobId).eq("worker_id", null);
+  }
   await admin.from("processing_job_events").insert({
     job_id: jobId, owner_id: current.owner_id,
     event_type: job.status === "queued" ? "retry_scheduled" : job.status,
