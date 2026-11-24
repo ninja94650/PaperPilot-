@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
-import { validateFile } from "./server.mjs";
+import { app, validateFile } from "./server.mjs";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
 
 const oleHeader = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
@@ -148,4 +148,18 @@ test("rejects mismatched local and central directory metadata", () => {
   const archive = makeZip(docxEntries);
   archive.writeUInt32LE(123, 14);
   assert.throws(() => validateOOXMLArchive(archive, "word/document.xml"), /metadata do not match/i);
+});
+
+test("retired synchronous conversion endpoint cannot bypass the scan queue", async () => {
+  const server = app.listen(0, "127.0.0.1");
+  try {
+    await new Promise((resolve) => server.once("listening", resolve));
+    const address = server.address();
+    const response = await fetch("http://127.0.0.1:" + address.port + "/convert", { method: "POST" });
+    assert.equal(response.status, 410);
+    const body = await response.json();
+    assert.match(body.error, /processing job/i);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
