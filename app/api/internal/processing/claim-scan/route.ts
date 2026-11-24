@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: "Could not claim a scan job." }, { status: 500 });
   const job = Array.isArray(data) ? data[0] : data;
   if (!job) return NextResponse.json({ job: null }, { headers: { "Cache-Control": "no-store" } });
-  if (!job.input_storage_path || !job.owner_id) return NextResponse.json({ error: "The scan job has no input object." }, { status: 500 });
+  if (!job.input_storage_path || !job.owner_id || !job.input_storage_path.startsWith(job.owner_id + "/")) return NextResponse.json({ error: "The scan job has no valid owner-scoped input object." }, { status: 500 });
   const { data: signed, error: signedError } = await admin.storage.from("documents").createSignedUrl(job.input_storage_path, 120);
   if (signedError || !signed?.signedUrl) return NextResponse.json({ error: "Could not sign the quarantined input." }, { status: 502 });
   return NextResponse.json({
