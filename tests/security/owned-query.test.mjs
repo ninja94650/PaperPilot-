@@ -24,7 +24,7 @@ function fakeSupabase(rowsByTable) {
   };
 }
 
-test("owner-scoped lookup returns the caller's job and applies owner filter in SQL query", async () => {
+test("owner-scoped lookup returns the caller's job and applies owner filter in query", async () => {
   const db = fakeSupabase({ processing_jobs: [
     { id: "job-a", owner_id: "user-a", status: "succeeded" },
     { id: "job-b", owner_id: "user-b", status: "succeeded" }
@@ -46,18 +46,19 @@ test("foreign user's job ID is indistinguishable from a missing job", async () =
 
 test("foreign user's immutable revision cannot be resolved for download", async () => {
   const db = fakeSupabase({ document_revisions: [
-    { id: "rev-b", processing_job_id: "job-b", owner_id: "user-b", storage_path: "user-b/private.pdf" }
+    { processing_job_id: "job-b", owner_id: "user-b", storage_path: "user-b/private.pdf" }
   ] });
   const result = await selectOwnedRecord(
-    db, "document_revisions", "storage_path,mime_type,version", "job-b", "user-a"
+    db, "document_revisions", "storage_path,mime_type,version", "job-b", "user-a", "processing_job_id"
   );
   assert.equal(result.data, null);
-  assert.deepEqual(db.traces[0].filters, [["id", "job-b"], ["owner_id", "user-a"]]);
+  assert.deepEqual(db.traces[0].filters, [["processing_job_id", "job-b"], ["owner_id", "user-a"]]);
 });
 
-test("rejects missing owner or resource identifiers before querying", async () => {
+test("rejects missing owner, resource identifiers and unsafe resource columns", async () => {
   const db = fakeSupabase({});
   await assert.rejects(selectOwnedRecord(db, "processing_jobs", "id", "job-a", ""), TypeError);
   await assert.rejects(selectOwnedRecord(db, "processing_jobs", "id", "", "user-a"), TypeError);
+  await assert.rejects(selectOwnedRecord(db, "processing_jobs", "id", "job-a", "user-a", "owner_id;drop table"), TypeError);
   assert.equal(db.traces.length, 0);
 });
