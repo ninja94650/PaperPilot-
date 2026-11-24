@@ -3,7 +3,7 @@ FROM node:22-bookworm-slim
 ENV NODE_ENV=production \
     HOME=/tmp \
     TMPDIR=/tmp \
-    SAL_USE_VCLPLUGIN=gen
+    SAL_USE_VCLPLUGIN=svp
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends libreoffice-writer libreoffice-impress libreoffice-calc fonts-liberation fonts-noto-core \
