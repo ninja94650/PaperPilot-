@@ -82,10 +82,17 @@ insert into paperpilot_rls_assertions
 select (select count(*)=1 from storage.objects where bucket_id='documents' and name like (select owner_a::text || '/%' from paperpilot_fixture_ids));
 insert into paperpilot_rls_assertions
 select (select count(*)=0 from storage.objects where bucket_id='documents' and name like (select owner_b::text || '/%' from paperpilot_fixture_ids));
-insert into paperpilot_rate_limit_results(owner_label,allowed,remaining,retry_after_seconds)
-select 'owner-a', result.allowed, result.remaining, result.retry_after_seconds
-from generate_series(1,11) as attempt(n)
-cross join lateral public.consume_processing_api_rate_limit('job:create') as result;
+do $$
+declare
+  v_attempt integer;
+begin
+  for v_attempt in 1..11 loop
+    insert into paperpilot_rate_limit_results(owner_label,allowed,remaining,retry_after_seconds)
+    select 'owner-a',allowed,remaining,retry_after_seconds
+    from public.consume_processing_api_rate_limit('job:create');
+  end loop;
+end;
+$$;
 do $$
 begin
   begin
