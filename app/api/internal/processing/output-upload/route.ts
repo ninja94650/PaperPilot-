@@ -27,6 +27,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "The processing lease is no longer valid." }, { status: 409 });
   }
   const storagePath = job.owner_id + "/" + job.id + "/attempt-" + attempt + "/result.pdf";
+  const { data: reserved, error: reserveError } = await admin.from("processing_jobs").update({
+    output_storage_path: storagePath,
+    output_metadata: { expected_mime_type: "application/pdf", attempt }
+  }).eq("id", job.id).eq("status", "running").eq("worker_id", workerId).eq("attempt_count", attempt)
+    .gt("lease_expires_at", new Date().toISOString()).select("id").maybeSingle();
+  if (reserveError || !reserved) return NextResponse.json({ error: "The processing lease changed before output reservation." }, { status: 409 });
   const { data, error: signError } = await admin.storage.from("documents").createSignedUploadUrl(storagePath, { upsert: false });
   if (signError || !data?.token || !data.signedUrl) {
     return NextResponse.json({ error: "Could not create a one-object private upload token." }, { status: 500 });
