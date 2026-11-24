@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   if (current.output_storage_path && current.output_storage_path.startsWith(current.owner_id + "/" + jobId + "/")) {
     await admin.storage.from("documents").remove([current.output_storage_path]);
     await admin.from("processing_jobs").update({ output_storage_path: null, output_metadata: {} })
-      .eq("id", jobId).eq("worker_id", null);
+      .eq("id", jobId).eq("output_storage_path", current.output_storage_path);
   }
   await admin.from("processing_job_events").insert({
     job_id: jobId, owner_id: current.owner_id,
