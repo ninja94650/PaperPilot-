@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: "8080"
-      DOCUMENT_WORKER_TOKEN: \${DOCUMENT_WORKER_TOKEN:?Set a long random token}
+      DOCUMENT_WORKER_TOKEN: ${DOCUMENT_WORKER_TOKEN:?Set a long random token}
       MAX_CONCURRENT_JOBS: "2"
       CONVERSION_TIMEOUT_MS: "90000"
     ports:
