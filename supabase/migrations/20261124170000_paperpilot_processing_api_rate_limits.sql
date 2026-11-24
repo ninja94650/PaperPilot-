@@ -8,7 +8,7 @@ create table if not exists public.processing_api_rate_limits (
   primary key (owner_id,bucket,window_start)
 );
 create index if not exists processing_api_rate_limits_window_idx
-  on public.processing_api_rate_limits(window_start);
+  on public.processing_api_rate_limits(owner_id,window_start);
 
 alter table public.processing_api_rate_limits enable row level security;
 revoke all on table public.processing_api_rate_limits from public,anon,authenticated;
@@ -43,7 +43,7 @@ begin
   end case;
 
   v_window_start := pg_catalog.to_timestamp(
-    pg_catalog.floor(pg_catalog.extract(epoch from pg_catalog.now()) / v_window) * v_window
+    pg_catalog.floor(extract(epoch from pg_catalog.now()) / v_window) * v_window
   );
 
   delete from public.processing_api_rate_limits
