@@ -27,7 +27,7 @@ The ClamAV service is reachable only on the Compose network at clamav:3310. Do n
 3. The scanner claims a short lease, downloads a short-lived signed input URL, and scans it through ClamAV INSTREAM.
 4. A clean result changes scan_status to clean. Rejected or repeatedly unavailable scans fail closed.
 5. The converter claims only clean jobs, renews its processing lease, validates the Office signature/OOXML archive, and converts in a disposable LibreOffice profile.
-6. The generated PDF is scanned again. Only a clean PDF is uploaded to a random private output key and published as an immutable document revision.
+6. The generated PDF is scanned again. Cancellation or a lost worker lease aborts the LibreOffice child process; atomic publication rechecks cancellation and lease state. Only a clean PDF is uploaded to a random private output key and published as an immutable document revision.
 7. Users poll the owner-scoped status endpoint and obtain a short-lived signed download URL only after success.
 
 The worker uses the same bearer token for its internal API calls. Keep it secret and rotate it if exposed. Do not place the Supabase service-role key in the worker or browser.
@@ -51,7 +51,7 @@ npm ci --prefix worker
 npm test --prefix worker
 ```
 
-Tests include Office signature/archive validation and a fake ClamD TCP server for clean, infected and invalid-input cases.
+Tests include Office signature/archive validation and a fake ClamD TCP server for clean, infected, protocol-error and invalid-size cases.
 
 ## Deployment gates
 
