@@ -129,18 +129,32 @@ async function processOne() {
   const claimed = await call("/api/internal/processing/claim", { workerId });
   if (!claimed.job) return false;
   const job = claimed.job;
-  const heartbeat = setInterval(() => {
-    call("/api/internal/processing/heartbeat", {
-      jobId: job.id, workerId, progressPercent: 40, message: "Converting Office document"
-    }).then(result => {
-      if (result.cancelRequested) process.stderr.write("Cancellation requested for " + job.id + "\n");
+  if (job.tool !== "office-to-pdf") {
+    await call("/api/internal/processing/fail", {
+      jobId: job.id, workerId, attempt: job.attempt,
+      code: "unsupported_tool", message: "This worker does not support the requested tool."
     }).catch(() => {});
+    return true;
+  }
+
+  const beat = async (progressPercent, message) => {
+    const result = await call("/api/internal/processing/heartbeat", {
+      jobId: job.id, workerId, progressPercent, message
+    });
+    if (result.cancelRequested) throw new Error("Cancellation requested by the user.");
+  };
+  const heartbeat = setInterval(() => {
+    beat(40, "Converting Office document").catch(() => {});
   }, 25_000);
+
   try {
+    await beat(10, "Downloading private input");
     const bytes = await download(job.inputUrl, maxInputBytes);
     const name = typeof job.input?.file_name === "string" ? job.input.file_name : "document.docx";
     const extension = validateOffice(bytes, name);
+    await beat(25, "Validating Office archive");
     const pdf = await convert(bytes, name, extension);
+    await beat(80, "Scanning generated PDF");
     const scan = await scanWithClamAv(pdf);
     if (!scan.clean) throw new Error("The generated PDF failed malware inspection.");
     await beat(95, "Publishing private output revision");
