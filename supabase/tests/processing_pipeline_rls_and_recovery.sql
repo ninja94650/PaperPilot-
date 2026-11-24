@@ -7,6 +7,9 @@ create temporary table paperpilot_rls_assertions(ok boolean not null check (ok))
 create temporary table paperpilot_claimed_jobs(
   id uuid not null, attempt_count integer not null, worker_id text not null
 );
+create temporary table paperpilot_rate_limit_results(
+  owner_label text not null, allowed boolean not null, remaining integer not null, retry_after_seconds integer not null
+);
 
 do $$
 declare
@@ -60,6 +63,7 @@ $$;
 
 grant select on paperpilot_fixture_ids to authenticated, service_role;
 grant insert on paperpilot_rls_assertions to authenticated;
+grant insert,select on paperpilot_rate_limit_results to authenticated;
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select owner_a::text from paperpilot_fixture_ids),true);
 insert into paperpilot_rls_assertions
@@ -78,7 +82,11 @@ insert into paperpilot_rls_assertions
 select (select count(*)=1 from storage.objects where bucket_id='documents' and name like (select owner_a::text || '/%' from paperpilot_fixture_ids));
 insert into paperpilot_rls_assertions
 select (select count(*)=0 from storage.objects where bucket_id='documents' and name like (select owner_b::text || '/%' from paperpilot_fixture_ids));
-do $$
+insert into paperpilot_rate_limit_results(owner_label,allowed,remaining,retry_after_seconds)
+select 'owner-a', result.allowed, result.remaining, result.retry_after_seconds
+from generate_series(1,11) as attempt(n)
+cross join lateral public.consume_processing_api_rate_limit('job:create') as result;
+do $
 begin
   begin
     insert into storage.objects(bucket_id,name)
@@ -91,6 +99,9 @@ end;
 $$;
 
 select set_config('request.jwt.claim.sub',(select owner_b::text from paperpilot_fixture_ids),true);
+insert into paperpilot_rate_limit_results(owner_label,allowed,remaining,retry_after_seconds)
+select 'owner-b',allowed,remaining,retry_after_seconds
+from public.consume_processing_api_rate_limit('job:create');
 insert into paperpilot_rls_assertions
 select (select count(*)=1 from public.processing_jobs where id=(select job_b from paperpilot_fixture_ids));
 insert into paperpilot_rls_assertions
@@ -113,6 +124,11 @@ do $$
 begin
   if (select count(*) from paperpilot_rls_assertions) <> 12 then
     raise exception 'One or more cross-tenant RLS assertions were not executed';
+  end if;
+  if (select count(*) from paperpilot_rate_limit_results where owner_label='owner-a' and allowed) <> 10
+     or (select count(*) from paperpilot_rate_limit_results where owner_label='owner-a' and not allowed) <> 1
+     or not exists (select 1 from paperpilot_rate_limit_results where owner_label='owner-b' and allowed and remaining=9) then
+    raise exception 'Per-user processing API rate limits did not enforce the expected quotas';
   end if;
   if (select count(*) from paperpilot_claimed_jobs) <> 1
      or not exists (
