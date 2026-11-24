@@ -77,7 +77,9 @@ export async function ocrPdf(file: File, language: string, onProgress?: (complet
   try {
     for (let pageNumber = 1; pageNumber <= source.numPages; pageNumber += 1) {
       const page = await source.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 1.7 });
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(1.7, Math.sqrt(16_000_000 / Math.max(1, baseViewport.width * baseViewport.height)));
+      const viewport = page.getViewport({ scale });
       const canvas = document.createElement("canvas");
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
@@ -129,7 +131,9 @@ export async function pdfToPngs(file: File): Promise<File[]> {
   const output: File[] = [];
   for (let pageNumber = 1; pageNumber <= source.numPages; pageNumber += 1) {
     const page = await source.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 1.5 });
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(1.5, Math.sqrt(16_000_000 / Math.max(1, baseViewport.width * baseViewport.height)));
+    const viewport = page.getViewport({ scale });
     const canvas = document.createElement("canvas");
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
