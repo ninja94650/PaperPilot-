@@ -23,7 +23,8 @@ Every internal route requires Authorization: Bearer DOCUMENT_WORKER_TOKEN. Compa
 | POST | /api/internal/processing/scan-result | Record clean/rejected/failed verdict for the active scan lease |
 | POST | /api/internal/processing/claim | Atomically claim a clean processing job and receive a signed input URL |
 | POST | /api/internal/processing/heartbeat | Renew an active lease, update progress and expose cancellation requests |
-| POST | /api/internal/processing/complete | Validate, store and publish an immutable PDF revision |
+| POST | /api/internal/processing/output-upload | Create a one-object signed upload URL for the active attempt |
+| POST | /api/internal/processing/complete | Verify uploaded object metadata and publish an immutable PDF revision |
 | POST | /api/internal/processing/fail | Record a failure, schedule bounded retry or finalize the job |
 
 ## Worker behavior
