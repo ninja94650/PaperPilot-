@@ -12,8 +12,8 @@ RUN apt-get update \
   && chown -R node:node /app
 
 WORKDIR /app
-COPY --chown=node:node package.json ./
-RUN npm install --omit=dev --ignore-scripts
+COPY --chown=node:node package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
 COPY --chown=node:node server.mjs ./
 
 USER node
