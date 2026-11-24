@@ -38,7 +38,8 @@ export default function LoginPage() {
           }
         });
         if (error) throw error;
-        setMessage(data.session ? "Your account is ready. Redirecting…" : "Check your email to confirm your account, then sign in.");
+        if (data.session) { router.replace("/account"); router.refresh(); }
+        else setMessage("Check your email to confirm your account, then sign in.");
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin + "/auth/callback?next=/update-password"
