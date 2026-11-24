@@ -78,7 +78,7 @@ export function convert(buffer, name, extension, signal) {
       if (error) reject(error); else resolve(value);
     };
     const onAbort = () => {
-      terminateProcessTree(child);
+      terminateProcessTree(child, "SIGKILL", process.kill, process.platform !== "win32");
       void finish(new Error("Conversion cancelled or worker lease lost."));
     };
     if (signal?.aborted) return finish(new Error("Conversion cancelled before start."));
