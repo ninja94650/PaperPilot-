@@ -61,3 +61,30 @@ grant select,insert,update,delete on public.documents to authenticated;
 grant select,insert,update,delete on public.processing_jobs to authenticated;
 grant all on public.documents to service_role;
 grant all on public.processing_jobs to service_role;
+
+-- Minimal private Storage object table and folder-owner policies for CI.
+create schema if not exists storage;
+create table storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text not null,
+  name text not null,
+  created_at timestamptz not null default now(),
+  unique(bucket_id,name)
+);
+alter table storage.objects enable row level security;
+create policy documents_storage_select_own on storage.objects
+  for select to authenticated
+  using (bucket_id='documents' and split_part(name,'/',1)=(select auth.uid())::text);
+create policy documents_storage_insert_own on storage.objects
+  for insert to authenticated
+  with check (bucket_id='documents' and split_part(name,'/',1)=(select auth.uid())::text);
+create policy documents_storage_update_own on storage.objects
+  for update to authenticated
+  using (bucket_id='documents' and split_part(name,'/',1)=(select auth.uid())::text)
+  with check (bucket_id='documents' and split_part(name,'/',1)=(select auth.uid())::text);
+create policy documents_storage_delete_own on storage.objects
+  for delete to authenticated
+  using (bucket_id='documents' and split_part(name,'/',1)=(select auth.uid())::text);
+grant usage on schema storage to authenticated, service_role;
+grant select,insert,update,delete on storage.objects to authenticated;
+grant all on storage.objects to service_role;
