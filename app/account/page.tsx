@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, FileStack, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import CloudLibrary from "@/components/cloud-library";
-import "@/app/auth.css";
 
 export const dynamic = "force-dynamic";
 
