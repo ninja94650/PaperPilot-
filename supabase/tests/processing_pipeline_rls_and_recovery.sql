@@ -120,8 +120,12 @@ from public.claim_processing_job('recovery-worker',180)
 where id=(select recovery_job from paperpilot_fixture_ids);
 reset role;
 
-do $$
+do $
 begin
+  raise notice 'rate limit rows: owner A allowed %, denied %, owner B rows %',
+    (select count(*) from paperpilot_rate_limit_results where owner_label='owner-a' and allowed),
+    (select count(*) from paperpilot_rate_limit_results where owner_label='owner-a' and not allowed),
+    (select count(*) from paperpilot_rate_limit_results where owner_label='owner-b' and allowed and remaining=9);
   if (select count(*) from paperpilot_rls_assertions) <> 12 then
     raise exception 'One or more cross-tenant RLS assertions were not executed';
   end if;
