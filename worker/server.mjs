@@ -7,6 +7,7 @@ import { join, extname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
+import { startQueueRunner } from "./queue-runner.mjs";
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -150,6 +151,7 @@ export function startServer() {
   }
   return app.listen(port, "0.0.0.0", () => {
     process.stdout.write("PaperPilot conversion worker listening on " + port + "\\n");
+    startQueueRunner();
   });
 }
 
