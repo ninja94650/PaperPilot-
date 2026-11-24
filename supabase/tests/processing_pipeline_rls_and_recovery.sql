@@ -78,7 +78,7 @@ insert into paperpilot_rls_assertions
 select (select count(*)=1 from storage.objects where bucket_id='documents' and name like (select owner_a::text || '/%' from paperpilot_fixture_ids));
 insert into paperpilot_rls_assertions
 select (select count(*)=0 from storage.objects where bucket_id='documents' and name like (select owner_b::text || '/%' from paperpilot_fixture_ids));
-do $
+do $$
 begin
   begin
     insert into storage.objects(bucket_id,name)
@@ -88,7 +88,7 @@ begin
     null;
   end;
 end;
-$;
+$$;
 
 select set_config('request.jwt.claim.sub',(select owner_b::text from paperpilot_fixture_ids),true);
 insert into paperpilot_rls_assertions
