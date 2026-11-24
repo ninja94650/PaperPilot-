@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const documentId = new URL(request.url).searchParams.get("documentId");
   if (!documentId) return NextResponse.json({ error: "Document ID is required." }, { status: 400 });
   const { data: row, error } = await supabase.from("documents")
-    .select("id,file_name,object_path,mime_type,created_at")
+    .select("id,file_name,object_path,mime_type,updated_at")
     .eq("id", documentId).single();
   if (error || !row) return NextResponse.json({ error: "Document not found in your private library." }, { status: 404 });
 
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   if (signedError || !signed) return NextResponse.json({ error: "Could not create a private document link." }, { status: 500 });
 
   const origin = new URL(request.url).origin;
-  const key = row.id.replace(/-/g, "") + "_" + new Date(row.created_at).getTime();
+  const key = row.id.replace(/-/g, "") + "_" + new Date(row.updated_at).getTime();
   const config: Record<string, unknown> = {
     documentType,
     document: {
