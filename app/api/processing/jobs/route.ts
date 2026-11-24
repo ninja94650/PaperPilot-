@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-const allowedTools = new Set(["office-to-pdf", "pdf-to-image", "image-to-pdf", "ocr", "pdf-compress"]);
+const allowedTools = new Set(["office-to-pdf"]);
 
 export async function POST(request: Request) {
   let supabase;
