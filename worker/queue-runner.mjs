@@ -5,6 +5,7 @@ import { join, extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
 import { scanWithClamAv } from "./clamav.mjs";
+import { terminateProcessTree } from "./process-control.mjs";
 
 const api = (process.env.PAPERPILOT_API_URL || "").replace(/\/+$/, "");
 const token = process.env.DOCUMENT_WORKER_TOKEN || "";
@@ -77,7 +78,7 @@ function convert(buffer, name, extension, signal) {
       if (error) reject(error); else resolve(value);
     };
     const onAbort = () => {
-      child?.kill("SIGKILL");
+      terminateProcessTree(child);
       void finish(new Error("Conversion cancelled or worker lease lost."));
     };
     if (signal?.aborted) return finish(new Error("Conversion cancelled before start."));
