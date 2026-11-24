@@ -21,11 +21,7 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: "Could not claim a processing job." }, { status: 500 });
   const job = Array.isArray(data) ? data[0] : data;
   if (!job) return NextResponse.json({ job: null }, { status: 200, headers: { "Cache-Control": "no-store" } });
-  if (job.output_storage_path && job.owner_id && job.output_storage_path.startsWith(job.owner_id + "/" + job.id + "/")) {
-    await admin.storage.from("documents").remove([job.output_storage_path]);
-    await admin.from("processing_jobs").update({ output_storage_path: null, output_metadata: {} })
-      .eq("id", job.id).eq("output_storage_path", job.output_storage_path);
-  }
+  // Stale output cleanup is delegated to the guarded cleanup endpoint after the worker lease is returned.
   if (!job.input_storage_path || !job.owner_id || !job.input_storage_path.startsWith(job.owner_id + "/")) {
     await admin.rpc("finish_processing_job", {
       p_job_id: job.id, p_worker_id: workerId, p_success: false,
