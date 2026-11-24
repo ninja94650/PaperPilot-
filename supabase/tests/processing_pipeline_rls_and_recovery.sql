@@ -36,7 +36,7 @@ begin
 
   update public.processing_jobs
   set worker_id='dead-worker', lease_expires_at=now()-interval '2 minutes',
-      heartbeat_at=now()-interval '3 minutes', available_at=now()-interval '1 minute'
+      heartbeat_at=now()-interval '3 minutes', available_at=now()-interval '100 years'
   where id=v_recovery_job;
 
   insert into public.document_revisions(owner_id,document_id,processing_job_id,version,storage_path,mime_type,size_bytes)
@@ -55,6 +55,7 @@ begin
 end;
 $$;
 
+grant select on paperpilot_fixture_ids to authenticated, service_role;
 grant insert on paperpilot_rls_assertions to authenticated;
 set local role authenticated;
 select set_config('request.jwt.claim.sub',(select owner_a::text from paperpilot_fixture_ids),true);
