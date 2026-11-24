@@ -25,14 +25,14 @@ export async function POST(request: NextRequest) {
   try { admin = createAdminClient(); }
   catch { return NextResponse.json({ error: "Worker output storage is not configured." }, { status: 503 }); }
   const { data: job, error: jobError } = await admin.from("processing_jobs")
-    .select("id,owner_id,document_id,status,worker_id,lease_expires_at,attempt_count")
+    .select("id,owner_id,document_id,status,worker_id,lease_expires_at,attempt_count,output_storage_path")
     .eq("id", jobId).maybeSingle();
   if (jobError) return NextResponse.json({ error: "Could not verify the processing job." }, { status: 500 });
   if (!job || job.status !== "running" || job.worker_id !== workerId || job.attempt_count !== attempt
     || !job.lease_expires_at || new Date(job.lease_expires_at).getTime() <= Date.now()) {
     return NextResponse.json({ error: "The worker lease is no longer valid." }, { status: 409 });
   }
-  if (!job.document_id || !storagePath.startsWith(job.owner_id + "/" + job.id + "/")
+  if (!job.document_id || job.output_storage_path !== storagePath || !storagePath.startsWith(job.owner_id + "/" + job.id + "/")
     || !new RegExp("^" + job.owner_id + "/" + job.id + "/attempt-" + attempt + "/result\\.pdf$").test(storagePath)) {
     return NextResponse.json({ error: "The output path is not scoped to this job and owner." }, { status: 403 });
   }
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
   const storedSize = Number(output?.metadata?.size ?? 0);
   const storedMime = String(output?.metadata?.mimetype ?? "");
   if (listError || !output || storedSize !== sizeBytes || storedMime !== "application/pdf") {
+    await admin.storage.from("documents").remove([storagePath]);
     return NextResponse.json({ error: "The uploaded private PDF object could not be verified." }, { status: 409 });
   }
 
