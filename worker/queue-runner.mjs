@@ -62,11 +62,29 @@ function validateOffice(buffer, name) {
   return extension;
 }
 
-function convert(buffer, name, extension) {
+function convert(buffer, name, extension, signal) {
   return new Promise(async (resolve, reject) => {
     let dir;
+    let child;
+    let timer;
+    let settled = false;
+    const finish = async (error, value) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
+      if (error) reject(error); else resolve(value);
+    };
+    const onAbort = () => {
+      child?.kill("SIGKILL");
+      void finish(new Error("Conversion cancelled or worker lease lost."));
+    };
+    if (signal?.aborted) return finish(new Error("Conversion cancelled before start."));
+    signal?.addEventListener("abort", onAbort, { once: true });
     try {
       dir = await mkdtemp(join(tmpdir(), "paperpilot-queue-"));
+      if (signal?.aborted) return onAbort();
       const inputDir = join(dir, "input");
       const outputDir = join(dir, "output");
       const profileDir = join(dir, "profile");
@@ -75,30 +93,32 @@ function convert(buffer, name, extension) {
       const inputPath = join(inputDir, base + extension);
       const outputPath = join(outputDir, base + ".pdf");
       await writeFile(inputPath, buffer, { flag: "wx", mode: 0o600 });
-      const child = spawn("libreoffice", [
+      child = spawn("libreoffice", [
         "-env:UserInstallation=file://" + profileDir, "--headless", "--nologo",
         "--nodefault", "--nolockcheck", "--norestore", "--convert-to", "pdf",
         "--outdir", outputDir, inputPath
       ], { cwd: outputDir, env: { ...process.env, HOME: profileDir, TMPDIR: outputDir }, stdio: ["ignore","ignore","pipe"] });
       let stderr = "";
       child.stderr.on("data", chunk => { stderr = (stderr + chunk.toString()).slice(-2000); });
-      const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
-      child.once("error", reject);
+      timer = setTimeout(() => {
+        child?.kill("SIGKILL");
+        void finish(new Error("Office conversion exceeded its time limit."));
+      }, timeoutMs);
+      child.once("error", error => { void finish(error); });
       child.once("close", async code => {
-        clearTimeout(timer);
+        if (settled) return;
         try {
+          if (signal?.aborted) throw new Error("Conversion cancelled or worker lease lost.");
           if (code !== 0) throw new Error("Office conversion failed: " + stderr.slice(-400));
           const pdf = await readFile(outputPath);
           if (pdf.length < 5 || pdf.length > maxOutputBytes || pdf.subarray(0,5).toString("ascii") !== "%PDF-") {
             throw new Error("The Office worker returned an invalid PDF.");
           }
-          resolve(pdf);
-        } catch (error) { reject(error); }
-        finally { await rm(dir, { recursive: true, force: true }).catch(() => {}); }
+          await finish(null, pdf);
+        } catch (error) { await finish(error); }
       });
     } catch (error) {
-      if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
-      reject(error);
+      await finish(error);
     }
   });
 }
@@ -143,8 +163,11 @@ async function processOne() {
     });
     if (result.cancelRequested) throw new Error("Cancellation requested by the user.");
   };
+  const controller = new AbortController();
   const heartbeat = setInterval(() => {
-    beat(40, "Converting Office document").catch(() => {});
+    beat(40, "Converting Office document").then(result => {
+      if (result.cancelRequested) controller.abort();
+    }).catch(() => controller.abort());
   }, 25_000);
 
   try {
@@ -153,7 +176,7 @@ async function processOne() {
     const name = typeof job.input?.file_name === "string" ? job.input.file_name : "document.docx";
     const extension = validateOffice(bytes, name);
     await beat(25, "Validating Office archive");
-    const pdf = await convert(bytes, name, extension);
+    const pdf = await convert(bytes, name, extension, controller.signal);
     await beat(80, "Scanning generated PDF");
     const scan = await scanWithClamAv(pdf);
     if (!scan.clean) throw new Error("The generated PDF failed malware inspection.");
@@ -182,6 +205,7 @@ async function processOne() {
     process.stderr.write("PaperPilot processing job " + job.id + " failed: " + String(error).slice(0,180) + "\n");
   } finally {
     clearInterval(heartbeat);
+    controller.abort();
   }
   return true;
 }
