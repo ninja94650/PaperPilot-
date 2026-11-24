@@ -141,7 +141,19 @@ export function validateOOXMLArchive(buffer, expectedMainPart) {
     );
     const localFlags = buffer.readUInt16LE(localOffset + 6);
     const localMethod = buffer.readUInt16LE(localOffset + 8);
-    if (localName !== name || localFlags !== flags || localMethod !== method) {
+    const centralCrc = buffer.readUInt32LE(cursor + 16);
+    const localCrc = buffer.readUInt32LE(localOffset + 14);
+    const localCompressedBytes = buffer.readUInt32LE(localOffset + 18);
+    const localUncompressedBytes = buffer.readUInt32LE(localOffset + 22);
+    const hasDataDescriptor = (flags & 0x0008) !== 0;
+    const localSizesMatch = hasDataDescriptor
+      ? (localCompressedBytes === 0 || localCompressedBytes === compressedBytes)
+        && (localUncompressedBytes === 0 || localUncompressedBytes === uncompressedBytes)
+        && (localCrc === 0 || localCrc === centralCrc)
+      : localCompressedBytes === compressedBytes
+        && localUncompressedBytes === uncompressedBytes
+        && localCrc === centralCrc;
+    if (localName !== name || localFlags !== flags || localMethod !== method || !localSizesMatch) {
       fail("Local and central directory metadata do not match.");
     }
     localRanges.push([localOffset, dataEnd]);
