@@ -11,6 +11,7 @@ import {
 import { addTextToPdf, extractPages, mergePdfs, rotatePages, splitPdf } from "@/lib/pdf-tools";
 import PdfPageWorkspace from "@/components/pdf-page-workspace";
 import AdvancedToolDialog from "@/components/advanced-tool-dialog";
+import CloudSaveButton from "@/components/cloud-save-button";
 
 type ToolId = "merge" | "split" | "rotate" | "extract" | "annotate" | "sign" | "compress" | "convert" | "ocr";
 type Tool = { id: ToolId; title: string; description: string; icon: typeof FileText; tint: string; ready: boolean; label?: string };
@@ -259,7 +260,7 @@ export default function Dashboard() {
             <span className="queue-file-name"><b>{file.name}</b><small>{formatBytes(file.size)} · {isPdf(file) ? "Ready for PDF tools" : file.type.startsWith("image/") ? "Ready for image conversion" : "Office conversion needs a connected worker"}</small></span>
             <button aria-label={"Remove " + file.name} className="icon-button" onClick={() => { setFiles((current) => current.filter((_, i) => i !== index)); setActiveIndex((current) => Math.max(0, current > index ? current - 1 : current === index ? 0 : current)); }}><X size={15} /></button>
           </div>)}</div>
-          <div className="queue-actions"><button className="primary-button compact" onClick={() => openEditor()}>Open PDF workspace <ArrowRight size={16} /></button></div>
+          <div className="queue-actions"><button className="primary-button compact" onClick={() => openEditor()}>Open PDF workspace <ArrowRight size={16} /></button><CloudSaveButton files={files} /></div>
         </div>}
       </section>
 
