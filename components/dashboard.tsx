@@ -45,6 +45,11 @@ function makeDownload(file: File) {
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
+function createPdfFile(bytes: Uint8Array, filename: string): File {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return new File([buffer], filename, { type: "application/pdf" });
+}
 
 export default function Dashboard() {
   const [files, setFiles] = useState<File[]>([]);
@@ -82,14 +87,8 @@ export default function Dashboard() {
     const selected = Array.from(incoming);
     const valid = selected.filter((file) => file.size <= maxFileSize);
     const oversized = selected.length - valid.length;
-    setFiles((current) => {
-      const remaining = Math.max(0, maxFiles - current.length);
-      const additions = valid.slice(0, remaining);
-      if (additions.length) {
-        setActiveIndex((index) => current.length === 0 ? 0 : index);
-      }
-      return [...current, ...additions];
-    });
+    if (files.length === 0 && valid.length > 0) setActiveIndex(0);
+    setFiles((current) => [...current, ...valid.slice(0, Math.max(0, maxFiles - current.length))]);
     const acceptedCount = Math.min(valid.length, Math.max(0, maxFiles - files.length));
     if (oversized) setNotice(oversized + " file(s) skipped: the per-file limit is 20 MB.");
     else if (acceptedCount < valid.length) setNotice("Your workspace can hold up to " + maxFiles + " files at once.");
@@ -145,27 +144,27 @@ export default function Dashboard() {
     try {
       if (action === "merge") {
         const merged = await mergePdfs(files);
-        const resultFile = new File([merged.bytes], merged.filename, { type: "application/pdf" });
+        const resultFile = createPdfFile(merged.bytes, merged.filename);
         setFiles((current) => [...current, resultFile]);
         setActiveIndex(files.length);
         setNotice("Merged " + pdfFiles.length + " PDFs into " + resultFile.name + ".");
       } else if (action === "rotate" && activeFile) {
         const result = await rotatePages(activeFile);
-        updateActiveFile(new File([result.bytes], result.filename, { type: "application/pdf" }));
+        updateActiveFile(createPdfFile(result.bytes, result.filename));
       } else if (action === "extract" && activeFile) {
         const result = await extractPages(activeFile, pageRange);
-        const resultFile = new File([result.bytes], result.filename, { type: "application/pdf" });
+        const resultFile = createPdfFile(result.bytes, result.filename);
         setFiles((current) => [...current, resultFile]);
         setActiveIndex(files.length);
         setNotice("Extracted selected pages into " + resultFile.name + ".");
       } else if (action === "annotate" && activeFile) {
         const result = await addTextToPdf(activeFile, annotation, false);
-        updateActiveFile(new File([result.bytes], result.filename, { type: "application/pdf" }));
+        updateActiveFile(createPdfFile(result.bytes, result.filename));
         setShowTextPanel(null);
         setAnnotation("");
       } else if (action === "sign" && activeFile) {
         const result = await addTextToPdf(activeFile, signature, true);
-        updateActiveFile(new File([result.bytes], result.filename, { type: "application/pdf" }));
+        updateActiveFile(createPdfFile(result.bytes, result.filename));
         setShowTextPanel(null);
         setSignature("");
       }
