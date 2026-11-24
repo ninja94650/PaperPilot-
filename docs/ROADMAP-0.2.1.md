@@ -57,7 +57,9 @@ Implemented in source:
 - Download endpoint only issues short-lived links for completed immutable revisions.
 
 Remaining:
-- ClamAV protocol tests cover clean, infected, protocol-error and invalid-size cases; worker HTTP regression tests confirm the retired synchronous endpoint returns HTTP 410. Add integration tests for worker crash, expired lease, retry delay, cancellation during LibreOffice, duplicate delivery and concurrent publication. ClamAV protocol unit tests now cover clean, infected, protocol-error and invalid-size outcomes.
+- Run the cancellation/process-group tests in CI and in the Linux worker container; verify no LibreOffice descendants survive abort or timeout.
+- Run the opt-in live ClamAV integration suite with fresh signatures (`CLAMAV_INTEGRATION=1`) in an isolated environment. The EICAR fixture is harmless test content; a skipped integration test is not a live scanner pass.
+- Exercise worker crash, retry delay, duplicate delivery and concurrent publication in a disposable Supabase environment.
 - Add SSE/realtime only if polling becomes insufficient; status GET remains the reconnect/recovery source of truth.
 
 ## Phase 5 — Security, observability and release gates
@@ -74,8 +76,11 @@ Verified against the linked Supabase project:
 - Supabase security advisor currently returns no findings. Performance advisor only reports unused-index notices on the low-volume/empty tables.
 
 Remaining before public use:
-- Automated cross-user/IDOR tests for every API route and storage object.
+- Added rollback-only SQL regression fixture `supabase/tests/processing_pipeline_rls_and_recovery.sql` covering owner A/B visibility for jobs, events and revisions plus expired processing-lease reclamation. Run it against a disposable Supabase database before release.
+- HTTP-level cross-user/IDOR tests for every API route and storage object remain.
 - Callback-forgery and malformed input regression tests.
+- Added opt-in live ClamAV EICAR and clean-PDF integration fixtures in `worker/clamav.integration.test.mjs`; not executed against a live scanner yet.
+- Added process-tree termination unit tests in `worker/process-control.test.mjs`; current CI has not yet reported a completed run for the newest head.
 - Host-level rate limiting, egress controls, metrics/alerts, log redaction, retention cleanup and backup/restore verification.
 - Supabase security/performance advisor recheck and full GitHub CI pass.
 - Vercel deployment API quota has previously been exhausted; do not bypass or pay. Use GitHub CI and wait for the free quota reset before requesting a preview deployment.
