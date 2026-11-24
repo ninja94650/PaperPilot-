@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       : { scan_status: verdict === "rejected" ? "rejected" : "failed", scanned_at: now, scan_engine: engine, scan_signature_version: signatureVersion, scan_worker_id: null, scan_lease_expires_at: null, status: "failed", completed_at: now, error_message: verdict === "rejected" ? "The uploaded document failed security inspection." : "Security inspection could not be completed.", last_error_code: "scan_" + verdict, updated_at: now };
   const { data: job, error } = await admin.from("processing_jobs").update(update)
     .eq("id", jobId).eq("scan_worker_id", workerId).eq("scan_attempt_count", attempt)
+    .gt("scan_lease_expires_at", now)
     .select("id,owner_id,status,scan_status,progress_message").maybeSingle();
   if (error) return NextResponse.json({ error: "Could not record the security inspection result." }, { status: 500 });
   if (!job) return NextResponse.json({ error: "The scan lease changed before the result was recorded." }, { status: 409 });
