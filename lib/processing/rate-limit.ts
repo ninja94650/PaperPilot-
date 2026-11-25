@@ -2,7 +2,8 @@ export type ProcessingRateLimitBucket =
   | "job:create"
   | "job:status"
   | "job:cancel"
-  | "job:download";
+  | "job:download"
+  | "editor:revision";
 
 export type ProcessingRateLimitResult = {
   allowed: boolean;
