@@ -77,6 +77,7 @@ export default function OfficeStudio({
   const [dirty, setDirty] = useState(false);
   const [sessionId, setSessionId] = useState(sessionIdProp || "");
   const [revision, setRevision] = useState(0);
+  const [saveEpoch, setSaveEpoch] = useState(0);
   const [cloudDocumentId, setCloudDocumentId] = useState<string | null>(cloudDocumentIdProp ?? null);
   const [parentRevisionId, setParentRevisionId] = useState<string | null>(parentRevisionIdProp ?? null);
   const [cloudBusy, setCloudBusy] = useState(false);
@@ -114,7 +115,7 @@ export default function OfficeStudio({
       if (!saving.current) controller.save();
     }, 2500);
     return () => window.clearTimeout(timer);
-  }, [viewerState.dirty, viewerState.rev, controller, sessionId]);
+  }, [viewerState.dirty, viewerState.rev, controller, sessionId, saveEpoch]);
 
   useEffect(() => {
     setCloudDocumentId(cloudDocumentIdProp ?? null);
@@ -197,6 +198,7 @@ export default function OfficeStudio({
       setMessage(error instanceof Error ? error.message : "The Office revision could not be saved.");
     } finally {
       saving.current = false;
+      setSaveEpoch((value) => value + 1);
     }
   }
 
