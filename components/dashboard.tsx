@@ -81,7 +81,12 @@ export default function Dashboard() {
   ), [search]);
 
   useEffect(() => {
-    if (activeAdvancedTool && files.length > 0) setShowAdvanced(true);
+    if (activeAdvancedTool && files.length > 0) {
+      setShowAdvanced(true);
+      setEditing(true);
+      setActiveTool(activeAdvancedTool);
+      void routeToFile(files[activeIndex] ?? files[0]);
+    }
   }, [activeAdvancedTool, files.length]);
 
   function importFiles(incoming: FileList | File[]) {
@@ -127,8 +132,10 @@ export default function Dashboard() {
     if (!tool?.ready) return;
     if (id === "compress" || id === "convert" || id === "ocr") {
       setActiveAdvancedTool(id);
-      if (files.length) setShowAdvanced(true);
-      else {
+      if (files.length) {
+        openEditor(id);
+        setShowAdvanced(true);
+      } else {
         document.getElementById("file-picker")?.click();
         setNotice("Choose a file to use " + tool.title + ".");
       }
@@ -306,7 +313,13 @@ export default function Dashboard() {
         tool={activeAdvancedTool}
         files={files}
         onClose={() => { setShowAdvanced(false); setActiveAdvancedTool(null); }}
-        onResult={(result) => { setFiles((current) => [...current, result]); setActiveIndex(files.length); }}
+        onResult={(result) => {
+          setShowAdvanced(false);
+          setActiveAdvancedTool(null);
+          setFiles((current) => [...current, result]);
+          setActiveIndex(files.length);
+          void routeToFile(result);
+        }}
       />}
 
       {notice && <div className="toast" role="status"><span><Check size={15} /></span>{notice}<button aria-label="Dismiss message" onClick={() => setNotice("")}><X size={15} /></button></div>}
