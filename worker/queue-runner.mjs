@@ -126,29 +126,36 @@ export function convert(buffer, name, extension, signal) {
   });
 }
 
+async function scanDocument(buffer) {
+  const startedAt = Date.now();
+  let outcome = "failed";
+  try {
+    const result = await scanWithClamAv(buffer);
+    outcome = result.clean ? "clean" : "rejected";
+    return result;
+  } finally {
+    recordScan(outcome, (Date.now() - startedAt) / 1000);
+  }
+}
+
 async function scanOne() {
   const claimed = await call("/api/internal/processing/claim-scan", { workerId });
   if (!claimed.job) return false;
   const job = claimed.job;
-  const startedAt = Date.now();
-  let outcome = "failed";
   try {
     const bytes = await download(job.inputUrl, maxInputBytes);
-    const result = await scanWithClamAv(bytes);
+    const result = await scanDocument(bytes);
     await call("/api/internal/processing/scan-result", {
       jobId: job.id, workerId, attempt: job.attempt,
       verdict: result.clean ? "clean" : "rejected",
       engine: "ClamAV", signatureVersion: result.signatureVersion
     });
-    outcome = result.clean ? "clean" : "rejected";
   } catch (error) {
     await call("/api/internal/processing/scan-result", {
       jobId: job.id, workerId, attempt: job.attempt, verdict: "failed",
       engine: "ClamAV", signatureVersion: "unavailable"
     }).catch(() => {});
     process.stderr.write("PaperPilot scan job " + job.id + " failed: " + String(error).slice(0,180) + "\n");
-  } finally {
-    recordScan(outcome, (Date.now() - startedAt) / 1000);
   }
   return true;
 }
@@ -189,7 +196,7 @@ async function processOne() {
     await beat(25, "Validating Office archive");
     const pdf = await convert(bytes, name, extension, controller.signal);
     await beat(80, "Scanning generated PDF");
-    const scan = await scanWithClamAv(pdf);
+    const scan = await scanDocument(pdf);
     if (!scan.clean) throw new Error("The generated PDF failed malware inspection.");
     await beat(95, "Publishing private output revision");
     const upload = await call("/api/internal/processing/output-upload", {
