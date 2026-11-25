@@ -70,11 +70,9 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-export async function createOfficeSessionId(file: File, kind: OfficeEditorKind): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const hex = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
-  return kind + ":" + hex;
+export async function createOfficeSessionId(_file: File, kind: OfficeEditorKind): Promise<string> {
+  // Each imported tab gets its own identity, even when two files have identical bytes.
+  return kind + ":" + crypto.randomUUID();
 }
 
 export async function ensureOfficeDraftSession(sessionId: string, file: File, kind: OfficeEditorKind) {
