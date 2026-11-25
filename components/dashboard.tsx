@@ -198,6 +198,8 @@ export default function Dashboard() {
     setEditing(false);
     setShowTextPanel(null);
     setActiveTool(null);
+    setActiveEditorKind("pdf");
+    setFormatWarning("");
     setActiveAdvancedTool(null);
     setShowAdvanced(false);
   }
@@ -350,8 +352,8 @@ export default function Dashboard() {
                 {busy && <div className="processing-shade"><LoaderCircle className="spin" size={26} /><b>Updating your document</b><small>Processing locally in your browser</small></div>}
                 {activeFile && activeEditorKind === "pdf" && isPdf(activeFile) ? <PdfPageWorkspace file={activeFile} onChange={updateActiveFile} /> : <div className="empty-preview">
                   <div className="empty-preview-icon">{activeFile ? <ImageIcon size={28} /> : <FileStack size={28} />}</div>
-                  <h3>{activeFile ? "Choose a PDF or convert this file" : "Your canvas is ready"}</h3>
-                  <p>{activeFile ? "Images can be converted locally. DOCX and PPTX conversion requires the secure LibreOffice worker connection." : "Import a PDF to preview and edit it here."}</p>
+                  <h3>{activeFile ? (activeEditorKind === "unsupported" ? "Unsupported document format" : editorLabel(activeEditorKind) + " is selected") : "Your canvas is ready"}</h3>
+                  <p>{activeFile ? (formatWarning || (activeEditorKind === "word" ? "Routed to Word Studio. Native Word editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "presentation" ? "Routed to Presentation Studio. Native slide editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "image" ? "Routed to Image Studio. Image editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "pdf" ? "This file could not be opened as a PDF. The original remains unchanged." : "This file cannot safely be opened in an editor.")) : "Import a document to begin."}</p>
                   <label className="primary-button compact" htmlFor="editor-file-picker"><Upload size={15} /> Import files</label>
                 </div>}
               </div>
