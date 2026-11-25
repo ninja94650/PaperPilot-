@@ -27,7 +27,20 @@ export async function GET(request: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
 
-  const documentId = new URL(request.url).searchParams.get("documentId") || "";
+  const url = new URL(request.url);
+  const revisionId = url.searchParams.get("revisionId");
+  if (revisionId) {
+    if (!UUID.test(revisionId)) return NextResponse.json({ error: "A valid revision ID is required." }, { status: 400 });
+    const admin = createAdminClient();
+    const { data: pending, error: pendingError } = await admin.from("editor_revision_scan_jobs")
+      .select("status,error_code").eq("revision_id", revisionId).eq("owner_id", user.id).maybeSingle();
+    if (pendingError) return NextResponse.json({ error: "Could not read revision scan status." }, { status: 500 });
+    if (pending) return NextResponse.json({ scanStatus: pending.status, errorCode: pending.error_code }, { headers: { "Cache-Control": "private, no-store" } });
+    const { data: published } = await supabase.from("editor_revisions").select("id,version").eq("id", revisionId).maybeSingle();
+    return published ? NextResponse.json({ scanStatus: "clean", revision: published }, { headers: { "Cache-Control": "private, no-store" } })
+      : NextResponse.json({ error: "Revision not found." }, { status: 404 });
+  }
+  const documentId = url.searchParams.get("documentId") || "";
   if (!UUID.test(documentId)) return NextResponse.json({ error: "A valid document ID is required." }, { status: 400 });
 
   const { data, error } = await supabase.from("editor_revisions")
