@@ -4,18 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { Download, FlipHorizontal, RotateCw, RotateCcw, RefreshCw, Image as ImageIcon } from "lucide-react";
 
 type OutputFormat = "image/png" | "image/jpeg" | "image/webp";
+type ImageEditState = { rotation: number; flip: boolean; brightness: number; contrast: number; saturation: number; maxWidth: number; format: OutputFormat; quality: number };
+const editSessions = new WeakMap<File, ImageEditState>();
 
 export default function ImageStudio({ file, onResult }: { file: File; onResult: (file: File) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
-  const [rotation, setRotation] = useState(0);
-  const [flip, setFlip] = useState(false);
-  const [brightness, setBrightness] = useState(100);
-  const [contrast, setContrast] = useState(100);
-  const [saturation, setSaturation] = useState(100);
-  const [maxWidth, setMaxWidth] = useState(0);
-  const [format, setFormat] = useState<OutputFormat>("image/png");
-  const [quality, setQuality] = useState(0.88);
+  const initial = editSessions.get(file);
+  const [rotation, setRotation] = useState(initial?.rotation ?? 0);
+  const [flip, setFlip] = useState(initial?.flip ?? false);
+  const [brightness, setBrightness] = useState(initial?.brightness ?? 100);
+  const [contrast, setContrast] = useState(initial?.contrast ?? 100);
+  const [saturation, setSaturation] = useState(initial?.saturation ?? 100);
+  const [maxWidth, setMaxWidth] = useState(initial?.maxWidth ?? 0);
+  const [format, setFormat] = useState<OutputFormat>(initial?.format ?? "image/png");
+  const [quality, setQuality] = useState(initial?.quality ?? 0.88);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -28,7 +31,7 @@ export default function ImageStudio({ file, onResult }: { file: File; onResult: 
       if (!active) return;
       imageRef.current = image;
       setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
-      setMaxWidth(image.naturalWidth);
+      setMaxWidth(editSessions.get(file)?.maxWidth || image.naturalWidth);
       setError("");
     };
     image.onerror = () => active && setError("This image could not be decoded by your browser.");
@@ -57,6 +60,10 @@ export default function ImageStudio({ file, onResult }: { file: File; onResult: 
     context.restore();
     setError("");
   }, [file, rotation, flip, brightness, contrast, saturation, maxWidth]);
+
+  useEffect(() => {
+    editSessions.set(file, { rotation, flip, brightness, contrast, saturation, maxWidth, format, quality });
+  }, [file, rotation, flip, brightness, contrast, saturation, maxWidth, format, quality]);
 
   function reset() {
     setRotation(0); setFlip(false); setBrightness(100); setContrast(100); setSaturation(100);
