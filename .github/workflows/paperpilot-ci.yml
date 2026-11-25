@@ -97,6 +97,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125150000_paperpilot_editor_revisions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125160000_paperpilot_office_source_mime_types.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125170000_paperpilot_editor_revision_rate_limit.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125180000_paperpilot_editor_revision_clamav_queue.sql
       - name: Execute cross-tenant RLS, lease recovery and API rate-limit fixture
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/processing_pipeline_rls_and_recovery.sql
       - name: Execute immutable editor revision and tenant isolation fixture
@@ -226,3 +227,45 @@ jobs:
             -e PAPERPILOT_E2E_INPUT=/fixtures/input/sample.docx \
             -v "$RUNNER_TEMP/paperpilot-office:/fixtures:ro" \
             --entrypoint node paperpilot-worker-ci /app/queue-to-storage.integration.mjs
+
+  office-browser-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install application dependencies from lockfile
+        run: npm ci
+      - name: Install pinned Office fixture dependencies
+        run: python -m pip install --disable-pip-version-check python-docx==1.1.2 python-pptx==1.0.2
+      - name: Install isolated browser test tools
+        run: npm install --prefix "$RUNNER_TEMP/paperpilot-office-tools" --no-save --no-package-lock vite@8.3.5 playwright-core@1.57.0
+      - name: Install Chromium
+        run: node "$RUNNER_TEMP/paperpilot-office-tools/node_modules/playwright-core/cli.js" install --with-deps chromium
+      - name: Generate rich and malformed Office fixtures
+        run: python tests/office/generate-fixtures.py
+      - name: Validate malformed and hostile Office archives
+        run: node --test tests/office/archive-validation.test.mjs
+      - name: Run DOCX/PPTX edit-save-reopen browser round trips
+        env:
+          OFFICE_E2E_TOOLS: ${{ runner.temp }}/paperpilot-office-tools
+          OFFICE_E2E_URL: http://127.0.0.1:4173
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/paperpilot-office-tools/node_modules/.bin/vite" --root tests/office/e2e --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/office-vite.log" 2>&1 &
+          VITE_PID=$!
+          trap 'kill "$VITE_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:4173/ >/dev/null || { cat "$RUNNER_TEMP/office-vite.log"; exit 1; }
+          node --test tests/office/e2e.test.mjs
