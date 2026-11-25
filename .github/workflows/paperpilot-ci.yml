@@ -94,8 +94,13 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124162518_paperpilot_processing_least_privilege_grants.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124163000_paperpilot_atomic_revision_publish.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124170000_paperpilot_processing_api_rate_limits.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125150000_paperpilot_editor_revisions.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125160000_paperpilot_office_source_mime_types.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125170000_paperpilot_editor_revision_rate_limit.sql
       - name: Execute cross-tenant RLS, lease recovery and API rate-limit fixture
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/processing_pipeline_rls_and_recovery.sql
+      - name: Execute immutable editor revision and tenant isolation fixture
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/editor_revisions_rls_and_publish.sql
 
   clamav-integration:
     runs-on: ubuntu-latest
