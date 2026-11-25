@@ -21,9 +21,11 @@
 - Enabling it uploads the original to the existing private `documents` bucket and creates the owner-scoped `documents` record.
 - Future autosaves upload to immutable paths:
   `<owner>/<document>/editor/<revision>/<filename>`.
-- The server downloads the uploaded object, checks the 20 MiB limit, validates the OOXML ZIP structure using the hardened archive validator, calculates SHA-256 itself and queues a private scan job. The revision is not inserted into `editor_revisions` at this stage.\n- The isolated worker claims a leased scan job, downloads the exact immutable Storage object, streams it to ClamAV, and reports the verdict through a bearer-authenticated internal endpoint. Only a clean verdict invokes the service-role-only immutable publisher. Rejected objects are removed; scanner failures retry with backoff and fail closed.
+- The server downloads the uploaded object, checks the 20 MiB limit, validates the OOXML ZIP structure using the hardened archive validator, calculates SHA-256 itself and queues a private scan job. The revision is not inserted into `editor_revisions` at this stage.
+- The isolated worker claims a leased scan job, downloads the exact immutable Storage object, streams it to ClamAV, and reports the verdict through a bearer-authenticated internal endpoint. Only a clean verdict invokes the service-role-only immutable publisher. Rejected objects are removed; scanner failures retry with backoff and fail closed.
 - The database assigns monotonically increasing per-document versions under a row lock and verifies the parent revision belongs to the same owner and document.
-- Cloud history lists only rows that have passed scanning; storage paths are never sent to the browser. Downloads use an owner-scoped published-row lookup and a 60-second signed URL.\n- The cloud library exposes **Open in PaperPilot** for DOCX/PPTX documents. A signed owner-scoped endpoint fetches the immutable original and latest published clean revision; a new browser/device creates a fresh local session linked to the same cloud document and revision parent.
+- Cloud history lists only rows that have passed scanning; storage paths are never sent to the browser. Downloads use an owner-scoped published-row lookup and a 60-second signed URL.
+- The cloud library exposes **Open in PaperPilot** for DOCX/PPTX documents. A signed owner-scoped endpoint fetches the immutable original and latest published clean revision; a new browser/device creates a fresh local session linked to the same cloud document and revision parent.
 - Restoring a cloud revision opens it as the current working copy; it does not overwrite or delete the stored revision.
 
 ## Database controls
@@ -34,7 +36,14 @@ The new `public.editor_revisions` table:
 - Revokes direct INSERT/UPDATE/DELETE from anon and authenticated.
 - Grants write access to service_role only.
 - Stores immutable revision id, owner, source document, version, parent revision, private object path, format, size, SHA-256 and creation time.
-- Uses a service-role-only `publish_editor_revision` function with a fixed search path and strict owner/document/path/format/parent checks.\n\nThe `public.editor_revision_scan_jobs` queue: - has RLS enabled and no browser grants; - stores only owner-scoped object metadata and scan state; - supports atomic `FOR UPDATE SKIP LOCKED` claims with bounded leases and three attempts; - is writable/readable only by `service_role`; - never exposes queued/scanning/rejected/failed objects through cloud history or the revision download route.
+- Uses a service-role-only `publish_editor_revision` function with a fixed search path and strict owner/document/path/format/parent checks.
+
+The `public.editor_revision_scan_jobs` queue:
+- Has RLS enabled and no browser grants.
+- Stores only owner-scoped object metadata and scan state.
+- Supports atomic `FOR UPDATE SKIP LOCKED` claims with bounded leases and three attempts.
+- Is writable/readable only by `service_role`.
+- Never exposes queued/scanning/rejected/failed objects through cloud history or the revision download route.
 
 Live verification returned:
 - RLS enabled: true
@@ -53,7 +62,10 @@ The existing Supabase security advisor findings about `processing_api_rate_limit
 - Browser tests perform edit → save → reopen and assert the edits and document structures remain.
 - Saved Office package inspection verifies DOCX tables, image relationships, header/footer and PPTX master, notes, table and image parts.
 - Malformed fixtures cover traversal paths, duplicate entries, macro payloads, excessive compression ratio and a corrupted ZIP end-of-central-directory record.
-- Browser malformed-package test asserts a truncated package is rejected rather than showing an editable canvas.\n- Worker queue-to-storage integration now exercises the Office revision scan claim and clean verdict before the existing conversion flow.\n- HTTP suite checks that the new Office worker endpoints reject missing or incorrect bearer credentials.\n- Disposable PostgreSQL fixture claims a queued Office revision and verifies worker id, attempt count and lease persistence.
+- Browser malformed-package test asserts a truncated package is rejected rather than showing an editable canvas.
+- Worker queue-to-storage integration now exercises the Office revision scan claim and clean verdict before the existing conversion flow.
+- HTTP suite checks that the new Office worker endpoints reject missing or incorrect bearer credentials.
+- Disposable PostgreSQL fixture claims a queued Office revision and verifies worker id, attempt count and lease persistence.
 - IndexedDB browser test verifies source preservation, latest revision recovery and cloud lineage survive a full page reload.
 - Disposable PostgreSQL test verifies direct writes are rejected, revision versions increment, parent lineage is recorded and cross-tenant rows remain hidden.
 
