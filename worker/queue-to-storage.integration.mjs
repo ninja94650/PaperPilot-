@@ -183,8 +183,8 @@ try {
   assert.equal(ready.status, 200, "worker readiness should confirm the scanner is reachable");
   const metricsResponse = await fetch("http://127.0.0.1:" + workerPort + "/metrics");
   const metricsText = await metricsResponse.text();
-  assert.match(metricsText, /paperpilot_worker_scans_total\\{result="clean"\\} 2/);
-  assert.match(metricsText, /paperpilot_worker_jobs_total\\{result="succeeded"\\} 1/);
+  assert.ok(metricsText.includes('paperpilot_worker_scans_total{result="clean"} 2'));
+  assert.ok(metricsText.includes('paperpilot_worker_jobs_total{result="succeeded"} 1'));
   assert.deepEqual(events.filter(event => ["scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"].includes(event)), [
     "scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"
   ]);
