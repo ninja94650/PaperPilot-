@@ -32,8 +32,15 @@ CLAMAV_DESTINATIONS="$(join_csv "${clamav_ips[@]}")"
 RULES="$(mktemp)"
 trap 'rm -f "$RULES"' EXIT
 
-if nft list table inet paperpilot_worker_egress >/dev/null 2>&1; then
-  printf 'delete table inet paperpilot_worker_egress\n' >> "$RULES"
+if [[ "$MODE" == "--apply" ]]; then
+  if [[ "$EUID" -ne 0 ]]; then
+    echo "--apply requires root on the Docker host." >&2
+    exit 1
+  fi
+  command -v nft >/dev/null || { echo "nftables is required on the Docker host." >&2; exit 1; }
+  if nft list table inet paperpilot_worker_egress >/dev/null 2>&1; then
+    printf 'delete table inet paperpilot_worker_egress\n' >> "$RULES"
+  fi
 fi
 
 cat >> "$RULES" <<EOF
@@ -62,7 +69,6 @@ table inet paperpilot_worker_egress {
 }
 EOF
 
-nft -c -f "$RULES"
 echo "Resolved worker API/Supabase IPv4 destinations: $WORKER_DESTINATIONS"
 echo "Resolved ClamAV update IPv4 destinations: $CLAMAV_DESTINATIONS"
 echo "Worker egress IP: $PAPERPILOT_WORKER_EGRESS_IP; ClamAV egress IP: $PAPERPILOT_CLAMAV_EGRESS_IP"
@@ -72,9 +78,6 @@ if [[ "$MODE" == "--dry-run" ]]; then
   exit 0
 fi
 
-if [[ "$EUID" -ne 0 ]]; then
-  echo "--apply requires root on the Docker host." >&2
-  exit 1
-fi
+nft -c -f "$RULES"
 nft -f "$RULES"
 echo "Applied PaperPilot worker egress rules. Re-run after DNS changes and verify with the deployment checks."
