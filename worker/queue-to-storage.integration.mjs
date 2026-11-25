@@ -199,7 +199,7 @@ try {
   assert.ok(metricsText.includes('paperpilot_worker_scans_total{result="clean"} 3'));
   assert.ok(metricsText.includes('paperpilot_worker_jobs_total{result="succeeded"} 1'));
   assert.deepEqual(events.filter(event => ["scan-result", "editor-scan-result", "claim", "editor-claim-scan", "output-upload", "storage:put", "complete", "revision:published"].includes(event)), [
-    "scan-result", "editor-claim-scan", "editor-scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"
+    "scan-result", "editor-claim-scan", "editor-scan-result", "editor-claim-scan", "claim", "output-upload", "storage:put", "complete", "revision:published"
   ]);
   assert.equal(events.includes("fail"), false);
   process.stdout.write("PASS: ClamAV-gated Office revision publication; then scanned DOCX -> LibreOffice PDF -> private object upload -> verified revision publication (" + result.outputBytes + " bytes).\n");
