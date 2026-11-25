@@ -74,7 +74,7 @@ insert into public.editor_revision_scan_jobs(
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'word',1200,repeat('c',64)
 );
-do $
+do $body$
 declare v_count integer;
 begin
   select count(*) into v_count from public.claim_editor_revision_scan_job('office-ci-worker',120);
@@ -86,7 +86,7 @@ begin
       and lease_expires_at > now()
   ) then raise exception 'Office scan lease metadata was not persisted'; end if;
 end
-$;
+$body$;
 
 reset role;
 set role authenticated;
