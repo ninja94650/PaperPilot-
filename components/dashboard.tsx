@@ -420,7 +420,7 @@ export default function Dashboard() {
                   const sessionId = officeSessionIds.get(sessionFile);
                   const cloudLink = sessionId ? officeCloudLinks.get(sessionId) : undefined;
                   const sourceFile = sessionId ? officeSourceFiles.get(sessionId) : undefined;
-                  return <div key={sessionFile.name + sessionFile.lastModified + files.indexOf(sessionFile)} style={{ position: "absolute", inset: 0, visibility: activeSession ? "visible" : "hidden", pointerEvents: activeSession ? "auto" : "none", zIndex: activeSession ? 2 : 1 }}>
+                  return <div key={officeSessionIds.get(sessionFile) ?? (sessionFile.name + sessionFile.lastModified + files.indexOf(sessionFile))} style={{ position: "absolute", inset: 0, visibility: activeSession ? "visible" : "hidden", pointerEvents: activeSession ? "auto" : "none", zIndex: activeSession ? 2 : 1 }}>
                     <OfficeStudio
                       file={sessionFile}
                       sourceFile={sourceFile}
