@@ -58,6 +58,7 @@ export default function OfficeStudio({
           editable
           allowSave
           allowDownload
+          allowOpen={false}
           onDirtyChange={setDirty}
           onSave={saveRevision}
           style={{ width: "100%", height: "100%" }}
