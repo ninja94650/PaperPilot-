@@ -113,9 +113,9 @@ test("PPTX: edit, save, reopen and preserve master, notes, table and image", asy
   await page.close();
 });
 
-test("malformed traversal package is rejected by the browser editor", async () => {
+test("malformed ZIP directory is rejected by the browser editor", async () => {
   const page = await browser.newPage();
-  await page.goto(base + "/?file=/malformed-traversal.docx");
+  await page.goto(base + "/?file=/malformed-eocd.docx");
   await page.waitForFunction(() => window.__paperpilotOffice?.events.some((event) => event.type === "error"), null, { timeout: 30000 });
   const error = await page.evaluate(() => window.__paperpilotOffice.events.find((event) => event.type === "error"));
   assert.ok(error?.message, "malformed package must fail with a reported parser error");
