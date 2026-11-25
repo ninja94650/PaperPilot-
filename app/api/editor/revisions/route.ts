@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: "Secure revision storage is not configured." }, { status: 503 }); }
 
   const { data: source, error: sourceError } = await admin.from("documents")
-    .select("id,owner_id,status")
+    .select("id,owner_id,status,mime_type")
     .eq("id", documentId).eq("owner_id", user.id).maybeSingle();
   if (sourceError || !source || source.status === "deleted") {
     return NextResponse.json({ error: "Source document not found in your private library." }, { status: 404 });
