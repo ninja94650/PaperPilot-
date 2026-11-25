@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, BadgeCheck, Check, ChevronRight,
   CloudUpload, Combine, FileArchive, FileImage, FilePlus2, FileSearch, FileStack,
@@ -11,6 +11,7 @@ import {
 import { addTextToPdf, extractPages, mergePdfs, rotatePages, splitPdf } from "@/lib/pdf-tools";
 import PdfPageWorkspace from "@/components/pdf-page-workspace";
 import ImageStudio from "@/components/image-studio";
+import OfficeStudio from "@/components/office-studio";
 import AdvancedToolDialog from "@/components/advanced-tool-dialog";
 import CloudSaveButton from "@/components/cloud-save-button";
 import { detectDocumentFormat, editorLabel, type EditorKind } from "@/lib/document-format.mjs";
@@ -74,6 +75,8 @@ export default function Dashboard() {
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [activeEditorKind, setActiveEditorKind] = useState<EditorKind>("pdf");
   const [formatWarning, setFormatWarning] = useState("");
+  const [officeSessions, setOfficeSessions] = useState<Map<File, "word" | "presentation">>(new Map());
+  const routeToken = useRef(0);
 
   const activeFile = files[activeIndex] ?? null;
   const pdfFiles = files.filter(isPdf);
@@ -112,9 +115,19 @@ export default function Dashboard() {
     importFiles(event.dataTransfer.files);
   }
   async function routeToFile(file: File) {
+    const token = ++routeToken.current;
     const detected = detectDocumentFormat(new Uint8Array(await file.arrayBuffer()), file.name, file.type);
-    setActiveEditorKind(detected.editor);
-    setFormatWarning(detected.warning || "");
+    if (detected.editor === "word" || detected.editor === "presentation") {
+      setOfficeSessions((current) => {
+        const next = new Map(current);
+        next.set(file, detected.editor);
+        return next;
+      });
+    }
+    if (token === routeToken.current) {
+      setActiveEditorKind(detected.editor);
+      setFormatWarning(detected.warning || "");
+    }
     return detected;
   }
   function openEditor(tool: ToolId | null = null) {
@@ -127,6 +140,7 @@ export default function Dashboard() {
     setEditing(true);
     setShowTextPanel(tool === "annotate" || tool === "sign" ? tool : null);
     setNotice("");
+    if (files[activeIndex]) void routeToFile(files[activeIndex]);
   }
   function chooseTool(id: ToolId) {
     const tool = tools.find((item) => item.id === id);
@@ -355,7 +369,7 @@ export default function Dashboard() {
                   <button onClick={() => runPdfAction("rotate")} disabled={busy || !activeFile || !isPdf(activeFile)}><RotateCw size={15} /><span>Rotate</span></button>
                   <button onClick={() => setShowTextPanel("annotate")} disabled={busy || !activeFile || !isPdf(activeFile)}><PenLine size={15} /><span>Text note</span></button>
                   <button onClick={() => setShowTextPanel("sign")} disabled={busy || !activeFile || !isPdf(activeFile)}><Signature size={15} /><span>Sign</span></button>
-                  <button className="download-action" onClick={() => activeFile && makeDownload(activeFile)} disabled={!activeFile}><Download size={15} /><span>Download</span></button>
+                  <button className="download-action" onClick={() => activeFile && makeDownload(activeFile)} disabled={!activeFile || activeEditorKind === "word" || activeEditorKind === "presentation"}><Download size={15} /><span>Download</span></button>
                 </div>
               </div>
               {showTextPanel && <div className="edit-inline-panel"><div><b>{showTextPanel === "sign" ? "Add a signature" : "Add a text note"}</b><small>{showTextPanel === "sign" ? "A typed signature will be placed on the first page." : "Your note will be placed near the top of the first page."}</small></div>
@@ -363,14 +377,26 @@ export default function Dashboard() {
                 <button className="small-primary" disabled={busy} onClick={() => runPdfAction(showTextPanel)}>{busy ? <LoaderCircle className="spin" size={14} /> : <Check size={14} />} Apply</button>
                 <button className="panel-dismiss" aria-label="Close input panel" onClick={() => setShowTextPanel(null)}><X size={15} /></button>
               </div>}
-              <div className="preview-stage">
+              <div className="preview-stage" style={{ position: "relative" }}>
                 {busy && <div className="processing-shade"><LoaderCircle className="spin" size={26} /><b>Updating your document</b><small>Processing locally in your browser</small></div>}
-                {activeFile && activeEditorKind === "pdf" && isPdf(activeFile) ? <PdfPageWorkspace file={activeFile} onChange={updateActiveFile} /> : activeFile && activeEditorKind === "image" ? <ImageStudio key={activeIndex} file={activeFile} onResult={(result) => { setFiles((current) => [...current, result]); setActiveIndex(files.length); void routeToFile(result); setNotice("Image edits exported as a new revision. The original remains unchanged."); }} /> : <div className="empty-preview">
+                {activeFile && activeEditorKind === "pdf" && isPdf(activeFile) ? <PdfPageWorkspace file={activeFile} onChange={updateActiveFile} /> : activeFile && activeEditorKind === "image" ? <ImageStudio key={activeIndex} file={activeFile} onResult={(result) => { setFiles((current) => [...current, result]); setActiveIndex(files.length); void routeToFile(result); setNotice("Image edits exported as a new revision. The original remains unchanged."); }} /> : activeFile && (activeEditorKind === "word" || activeEditorKind === "presentation") && officeSessions.get(activeFile) === activeEditorKind ? null : <div className="empty-preview">
                   <div className="empty-preview-icon">{activeFile ? <ImageIcon size={28} /> : <FileStack size={28} />}</div>
                   <h3>{activeFile ? (activeEditorKind === "unsupported" ? "Unsupported document format" : editorLabel(activeEditorKind) + " is selected") : "Your canvas is ready"}</h3>
-                  <p>{activeFile ? (formatWarning || (activeEditorKind === "word" ? "Routed to Word Studio. Native Word editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "presentation" ? "Routed to Presentation Studio. Native slide editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "image" ? "Routed to Image Studio. Image editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "pdf" ? "This file could not be opened as a PDF. The original remains unchanged." : "This file cannot safely be opened in an editor.")) : "Import a document to begin."}</p>
+                  <p>{activeFile ? (formatWarning || (activeEditorKind === "word" ? "Word Studio is opening this document. The original remains unchanged." : activeEditorKind === "presentation" ? "Presentation Studio is opening this deck. The original remains unchanged." : activeEditorKind === "image" ? "Image Studio is opening this image. The original remains unchanged." : activeEditorKind === "pdf" ? "This file could not be opened as a PDF. The original remains unchanged." : "This file cannot safely be opened in an editor.")) : "Import a document to begin."}</p>
                   <label className="primary-button compact" htmlFor="editor-file-picker"><Upload size={15} /> Import files</label>
                 </div>}
+                {Array.from(officeSessions.entries()).filter(([sessionFile]) => files.includes(sessionFile)).map(([sessionFile, kind]) => {
+                  const activeSession = sessionFile === activeFile && kind === activeEditorKind;
+                  return <div key={sessionFile.name + sessionFile.lastModified + files.indexOf(sessionFile)} style={{ position: "absolute", inset: 0, visibility: activeSession ? "visible" : "hidden", pointerEvents: activeSession ? "auto" : "none", zIndex: activeSession ? 2 : 1 }}>
+                    <OfficeStudio file={sessionFile} kind={kind} onSave={(revision) => {
+                      const nextIndex = files.length;
+                      setFiles((current) => [...current, revision]);
+                      setActiveIndex(nextIndex);
+                      void routeToFile(revision);
+                      setNotice("Saved " + revision.name + " as a new revision. The original and previous revisions remain unchanged.");
+                    }} />
+                  </div>;
+                })}
               </div>
               <div className="editor-bottom-bar">
                 <span><span className="status-dot" /> {activeFile ? editorLabel(activeEditorKind) + (activeEditorKind === "pdf" ? " ready" : " selected") : "Waiting for a file"}</span>
