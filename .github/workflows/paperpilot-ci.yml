@@ -252,7 +252,7 @@ jobs:
           exit 1
       - name: Run real DOCX/PPTX edit-save-reopen browser tests
         env:
-          OFFICE_E2E_TOOLS: ${{ runner.temp }}/office-tools
+          OFFICE_E2E_TOOLS: "${{ runner.temp }}/office-tools"
           OFFICE_E2E_URL: "http://127.0.0.1:4173"
         run: node --test tests/office/e2e.test.mjs
       - name: Stop isolated Office editor fixture server
