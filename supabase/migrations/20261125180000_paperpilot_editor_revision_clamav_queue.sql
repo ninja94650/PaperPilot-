@@ -40,6 +40,11 @@ begin
      or p_lease_seconds < 30 or p_lease_seconds > 300 then
     raise exception 'editor_scan_claim_invalid';
   end if;
+  update public.editor_revision_scan_jobs
+  set status='failed', worker_id=null, lease_expires_at=null,
+      error_code='scan_attempts_exhausted', updated_at=now()
+  where status='scanning' and lease_expires_at <= now() and attempt_count >= 3;
+
   select * into v_job
   from public.editor_revision_scan_jobs
   where (status = 'queued' and available_at <= now())
