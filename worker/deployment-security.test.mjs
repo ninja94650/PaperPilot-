@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 
 const compose = await readFile(new URL("./compose.yaml", import.meta.url), "utf8");
 const prometheus = await readFile(new URL("./prometheus.yml", import.meta.url), "utf8");
+const alerts = await readFile(new URL("./alerts.yml", import.meta.url), "utf8");
 const firewall = await readFile(new URL("./egress-firewall.sh", import.meta.url), "utf8");
 
 test("ClamAV is never published to the host and uses the private worker network", () => {
@@ -29,6 +30,10 @@ test("worker API port and Prometheus UI are loopback-only; metrics are private-n
   assert.doesNotMatch(monitoring, /worker-egress/);
   assert.match(prometheus, /paperpilot-converter:8080/);
   assert.match(prometheus, /metrics_path: \/metrics/);
+  assert.match(prometheus, /alerts.yml/);
+  assert.match(alerts, /PaperPilotWorkerScrapeDown/);
+  assert.match(alerts, /PaperPilotQueuePollingStale/);
+  assert.match(alerts, /PaperPilotScannerFailures/);
 });
 
 test("private network has no default egress and resource limits remain explicit", () => {
