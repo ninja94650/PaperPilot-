@@ -122,3 +122,23 @@ test("malformed ZIP directory is rejected by the browser editor", async () => {
   assert.equal(await page.locator(".de-pages").count(), 0, "malformed package must not expose an editable document canvas");
   await page.close();
 });
+
+
+test("IndexedDB autosave survives refresh and restores immutable source and cloud lineage", async () => {
+  const page = await browser.newPage();
+  await page.goto(base + "/");
+  await page.waitForFunction(() => !!window.__paperpilotDraft);
+  const sessionId = await page.evaluate(() => window.__paperpilotDraft.createAndSave());
+  await page.reload();
+  await page.waitForFunction(() => !!window.__paperpilotDraft);
+  const drafts = await page.evaluate(() => window.__paperpilotDraft.list());
+  const recovered = drafts.find((draft) => draft.sessionId === sessionId);
+  assert.ok(recovered, "local Office draft must be discoverable after a full page reload");
+  assert.equal(recovered.sourceName, "draft-source.docx", "original source name must remain preserved");
+  assert.equal(recovered.latestName, "draft-revision.docx", "latest autosaved revision must be restored");
+  assert.equal(recovered.latestVersion, 1);
+  assert.equal(recovered.cloudDocumentId, "11111111-1111-4111-8111-111111111111");
+  assert.equal(recovered.parentRevisionId, "22222222-2222-4222-8222-222222222222");
+  assert.ok(recovered.latestSize > 0);
+  await page.close();
+});
