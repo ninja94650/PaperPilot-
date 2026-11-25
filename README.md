@@ -1,47 +1,53 @@
 # PaperPilot
 
-A modern document workspace for viewing, organizing, editing and converting PDFs, Office documents and images.
+PaperPilot is a document workspace for PDF, Office and image workflows.
 
-## Current release
+## PaperPilot 0.2
 
-PaperPilot 0.2 adds Supabase-backed email authentication, private cloud storage foundations, account document metadata, and ownership policies while preserving browser-side PDF workflows. Heavy conversion and OCR still require isolated background workers.
+The 0.2 development branch adds:
+
+### Browser-side tools
+- PDF.js rendering with page thumbnails and page selection
+- Drag-to-reorder, move and delete PDF pages
+- Merge, split into one-page PDFs, extract, rotate, annotate and typed signatures
+- PDF compression presets (lossy rasterized output with a clear warning)
+- OCR text extraction from scanned PDFs (exports a text transcript)
+- Image-to-PDF and PDF-to-PNG conversion
+
+Browser-side PDF tools process suitable files locally and do not upload them to PaperPilot servers.
+
+### Accounts and cloud library
+- Supabase email sign-in, sign-up and password recovery
+- Private cloud document library with upload progress, signed downloads and user-scoped deletion
+- Existing Supabase RLS policies and document history
+
+### Office integrations
+- Authenticated API proxy and isolated LibreOffice worker for DOC/DOCX/PPT/PPTX conversion
+- Signed ONLYOFFICE editor configuration and save callback bridge
+
+Office conversion and ONLYOFFICE editing require separately deployed services and server-only secrets. They return explicit setup errors until those services are connected.
 
 ## Stack
-
 - Next.js App Router, React and TypeScript
-- Tailwind CSS
-- pdf-lib for browser-side PDF manipulation
+- PDF.js, Tesseract.js and pdf-lib
 - Supabase Auth, Postgres and private Storage
-- Neon reserved as a PostgreSQL fallback (not an Auth or Storage replacement)
-- Native browser PDF preview in the initial editor
-- Vercel for frontend hosting
+- LibreOffice worker container for Office conversion
+- ONLYOFFICE Docs for in-browser Office editing
+- Vercel for the web application
 
 ## Development
 
-```bash
-npm install
-npm run dev
-```
+Use Node.js 22.13+.
+
+    npm install
+    npm run dev
 
 Open http://localhost:3000.
 
-## Current capabilities
+Copy .env.example to .env.local. Keep service-role keys, worker tokens and ONLYOFFICE JWT secrets server-side.
 
-- Responsive PaperPilot dashboard and tool discovery
-- Drag-and-drop file selection
-- Local PDF preview
-- Merge, rotate, extract and split PDF pages in the browser
-- Add text annotations and signature text overlays
-- No file upload to a server is required for the browser-side PDF operations
-- Email/password sign-up, sign-in and password recovery
-- Account page with private document history foundation
-
-## Roadmap
-
-1. Add secure upload and asynchronous document jobs.
-2. Add DOCX/PPTX conversion and editing through an isolated Office worker / embedded editor.
-3. Add OCR, real compression, isolated conversion workers and team workspaces.
-
-## Security note
-
-The initial PDF workflows run locally in the browser. Do not treat this MVP as a production document-processing service until server-side upload validation, malware scanning, tenant isolation, retention policies and operational controls have been implemented.
+See:
+- docs/BACKEND-SETUP.md
+- docs/INTEGRATIONS-0.2.md
+- worker/README.md
+- docs/ROADMAP-0.2.md
