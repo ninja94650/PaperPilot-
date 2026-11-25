@@ -16,7 +16,7 @@ function download(file: File) {
 }
 
 export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
-  tool: ToolKind; files: File[]; onClose: () => void; onResult: (file: File) => void;
+  tool: ToolKind; files: File[]; onClose: () => void; onResult: (file: File | File[]) => void;
 }) {
   const [quality, setQuality] = useState("0.72");
   const [language, setLanguage] = useState("eng");
@@ -72,7 +72,8 @@ export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
       } else if (action === "pdf-images") {
         const results = await pdfToPngs(file);
         results.forEach((item) => download(item));
-        setMessage(results.length + " page image(s) exported.");
+        onResult(results);
+        setMessage(results.length + " page image(s) exported and added to Image Studio tabs.");
       } else {
         const officeFile = office[0];
         if (!officeFile) throw new Error("Choose a DOC, DOCX, PPT or PPTX file.");
