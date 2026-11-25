@@ -32,7 +32,7 @@ The default Docker subnets are `172.30.42.0/24` (egress) and `172.30.43.0/24` (p
 3. Verify the actual container network addresses and routes:
 
    ```bash
-   docker inspect paperpilot-converter
+   docker inspect "$(docker compose ps -q paperpilot-converter)"
    docker network inspect worker_worker-private
    docker network inspect worker_worker-egress
    ```
