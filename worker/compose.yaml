@@ -5,10 +5,12 @@ services:
     expose:
       - "3310"
     networks:
-      worker-private:
-        ipv4_address: ${PAPERPILOT_CLAMAV_PRIVATE_IP:-172.30.43.11}
       worker-egress:
         ipv4_address: ${PAPERPILOT_CLAMAV_EGRESS_IP:-172.30.42.11}
+        gw_priority: 1
+      worker-private:
+        ipv4_address: ${PAPERPILOT_CLAMAV_PRIVATE_IP:-172.30.43.11}
+        gw_priority: 0
     volumes:
       - clamav-db:/var/lib/clamav
     mem_limit: 4g
@@ -32,10 +34,12 @@ services:
       PAPERPILOT_API_URL: ${PAPERPILOT_API_URL:?Set the PaperPilot application URL}
       PAPERPILOT_WORKER_ID: ${PAPERPILOT_WORKER_ID:-office-worker-1}
     networks:
-      worker-private:
-        ipv4_address: ${PAPERPILOT_WORKER_PRIVATE_IP:-172.30.43.10}
       worker-egress:
         ipv4_address: ${PAPERPILOT_WORKER_EGRESS_IP:-172.30.42.10}
+        gw_priority: 1
+      worker-private:
+        ipv4_address: ${PAPERPILOT_WORKER_PRIVATE_IP:-172.30.43.10}
+        gw_priority: 0
     ports:
       - "127.0.0.1:8080:8080"
     read_only: true
