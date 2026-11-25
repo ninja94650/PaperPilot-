@@ -109,3 +109,26 @@ Do not enable the engine for all users until every gate below passes:
 Proceed with an isolated browser-only pilot of `@p10node/office-engine@0.18.0` as the best zero-hosting candidate. Do not provision Oracle, Render, Vercel Daemons, or any other host. Do not integrate ONLYOFFICE or Collabora into PaperPilot until licence obligations and the commercial distribution model are explicitly settled.
 
 If the browser engine fails the preservation or security gates, do not silently fall back to lossy PDF conversion or a plain-text editor. Keep the original Office file recoverable and report the exact unsupported feature.
+
+
+## Isolated pilot implementation status
+
+A browser-only adapter has now been added on the PaperPilot feature branch:
+- Exact engine release `0.18.0` is pinned to the upstream GitHub release tarball.
+- The lockfile records the SHA-256 integrity from the GitHub release asset metadata: `sha256-Ri3q8sMDtm/afi5jh0gUnKS/BkXbZpkrl4+Jxn1HXN0=`.
+- `components/office-studio.tsx` dynamically loads the editor client-side, so it is not server-rendered.
+- Word and Presentation sessions are kept mounted when switching workspace tabs, preserving in-memory edits while the editor remains open.
+- The engine's Save callback creates a new `File` revision with a revision suffix. It never overwrites the uploaded original. The new revision is added as a separate workspace tab.
+- The existing PDF.js/PDF Studio branch is unchanged.
+- No Office server or cloud host has been provisioned.
+
+### Not yet verified
+
+The dependency and adapter have been committed, but the PaperPilot CI run for the latest dashboard integration has not yet completed. Do not call this production-ready until:
+- the full PaperPilot CI suite passes on the exact current PR head;
+- DOCX/PPTX no-op and edit/save/reopen fixtures pass;
+- malformed and adversarial OOXML fixtures are rejected safely;
+- manual Chrome/Edge checks confirm editor sessions survive tab switches and revisions are separate;
+- cloud revision persistence, page-refresh recovery and autosave are implemented and tested.
+
+The editor is currently a local in-memory session. Saving from the Office editor creates a local revision tab; it does not yet upload that revision automatically to Supabase. Closing or refreshing the editor can discard unsaved in-memory changes. Keep this limitation visible until persistent recovery is delivered.
