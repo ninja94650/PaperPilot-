@@ -274,6 +274,7 @@ export default function OfficeStudio({
         </div>)}
       </div>}
       <div role="status" aria-live="polite" style={{ padding: "4px 10px", color: "#718078", fontSize: 10 }}>{message}</div>
+      {cloudDocumentId && <div style={{ padding: "3px 10px", color: "#9a6424", background: "#fff9ed", fontSize: 9 }}>Cloud revisions are structurally validated but not antivirus-scanned yet. Use trusted documents only until scanner integration is complete.</div>}
       <div style={{ flex: 1, minHeight: 0 }}>
         <DocViewer
           src={file}
