@@ -1,7 +1,7 @@
 # Office Studio Autosave and Cloud Revision Security
 
-**Status:** Implemented on the feature branch; validation and browser CI gates pending.  
-**Database:** Supabase project `ueiwxomoirmncomzyudu`, migration `20261125150000_paperpilot_editor_revisions` applied and verified.  
+**Status:** Implemented on the feature branch; ClamAV queue, cross-device reopen and browser CI gates are awaiting successful verification.  
+**Database:** Existing Supabase project `ueiwxomoirmncomzyudu`; the new ClamAV queue migration is committed but not yet applied to the live project.  
 **Production:** Not deployed. PR #3 remains unmerged.
 
 ## What is implemented
@@ -21,9 +21,9 @@
 - Enabling it uploads the original to the existing private `documents` bucket and creates the owner-scoped `documents` record.
 - Future autosaves upload to immutable paths:
   `<owner>/<document>/editor/<revision>/<filename>`.
-- The server downloads the uploaded object, checks the 20 MiB limit, validates the OOXML ZIP structure using the hardened archive validator, calculates SHA-256 itself and publishes metadata through the service-role-only database function.
+- The server downloads the uploaded object, checks the 20 MiB limit, validates the OOXML ZIP structure using the hardened archive validator, calculates SHA-256 itself and queues a private scan job. The revision is not inserted into `editor_revisions` at this stage.\n- The isolated worker claims a leased scan job, downloads the exact immutable Storage object, streams it to ClamAV, and reports the verdict through a bearer-authenticated internal endpoint. Only a clean verdict invokes the service-role-only immutable publisher. Rejected objects are removed; scanner failures retry with backoff and fail closed.
 - The database assigns monotonically increasing per-document versions under a row lock and verifies the parent revision belongs to the same owner and document.
-- Cloud history lists metadata only; storage paths are never sent to the browser. Downloads use an owner-scoped row lookup and a 60-second signed URL.
+- Cloud history lists only rows that have passed scanning; storage paths are never sent to the browser. Downloads use an owner-scoped published-row lookup and a 60-second signed URL.\n- The cloud library exposes **Open in PaperPilot** for DOCX/PPTX documents. A signed owner-scoped endpoint fetches the immutable original and latest published clean revision; a new browser/device creates a fresh local session linked to the same cloud document and revision parent.
 - Restoring a cloud revision opens it as the current working copy; it does not overwrite or delete the stored revision.
 
 ## Database controls
@@ -34,7 +34,7 @@ The new `public.editor_revisions` table:
 - Revokes direct INSERT/UPDATE/DELETE from anon and authenticated.
 - Grants write access to service_role only.
 - Stores immutable revision id, owner, source document, version, parent revision, private object path, format, size, SHA-256 and creation time.
-- Uses a service-role-only `publish_editor_revision` function with a fixed search path and strict owner/document/path/format/parent checks.
+- Uses a service-role-only `publish_editor_revision` function with a fixed search path and strict owner/document/path/format/parent checks.\n\nThe `public.editor_revision_scan_jobs` queue: - has RLS enabled and no browser grants; - stores only owner-scoped object metadata and scan state; - supports atomic `FOR UPDATE SKIP LOCKED` claims with bounded leases and three attempts; - is writable/readable only by `service_role`; - never exposes queued/scanning/rejected/failed objects through cloud history or the revision download route.
 
 Live verification returned:
 - RLS enabled: true
@@ -53,21 +53,21 @@ The existing Supabase security advisor findings about `processing_api_rate_limit
 - Browser tests perform edit → save → reopen and assert the edits and document structures remain.
 - Saved Office package inspection verifies DOCX tables, image relationships, header/footer and PPTX master, notes, table and image parts.
 - Malformed fixtures cover traversal paths, duplicate entries, macro payloads, excessive compression ratio and a corrupted ZIP end-of-central-directory record.
-- Browser malformed-package test asserts a truncated package is rejected rather than showing an editable canvas.
+- Browser malformed-package test asserts a truncated package is rejected rather than showing an editable canvas.\n- Worker queue-to-storage integration now exercises the Office revision scan claim and clean verdict before the existing conversion flow.\n- HTTP suite checks that the new Office worker endpoints reject missing or incorrect bearer credentials.\n- Disposable PostgreSQL fixture claims a queued Office revision and verifies worker id, attempt count and lease persistence.
 - IndexedDB browser test verifies source preservation, latest revision recovery and cloud lineage survive a full page reload.
 - Disposable PostgreSQL test verifies direct writes are rejected, revision versions increment, parent lineage is recorded and cross-tenant rows remain hidden.
 
 ## Important security limitation
 
-**These cloud editor revisions are structurally validated, but are not yet ClamAV-scanned.** The browser autosave path does not currently route through the isolated ClamAV worker. Do not describe cloud Office autosave as malware-scanned or enable it broadly until the revision publication path is integrated with the existing scanner gate and a clean scan is required before a revision becomes downloadable.
+Cloud revision publication is now wired to the ClamAV queue in the feature branch, but **the new migration and updated worker have not yet been applied to a live worker/database environment**. Until the exact feature-branch CI gates pass and the worker is deployed by an operator, cloud revision publishing must be treated as unavailable/pilot-only. The browser leaves local autosaves intact and reports that cloud sync is pending or unavailable. Scanner timeout/outage and rejected verdicts fail closed; they never produce a downloadable revision.
 
-The current validation rejects malformed/unsafe ZIP metadata, traversal, duplicate paths, symlinks, macro payloads, oversized entries and high expansion ratios. This is not a substitute for antivirus scanning or a full OOXML semantic sanitizer.
+The current structural validator rejects malformed/unsafe ZIP metadata, traversal, duplicate paths, symlinks, macro payloads, oversized entries and high expansion ratios. This is not a substitute for antivirus scanning or a full OOXML semantic sanitizer.
 
 ## Remaining release gates
 
-1. Latest PaperPilot CI must pass on the exact feature branch head, including the new Office browser suite and disposable database fixture.
-2. Fix any browser round-trip failures before calling DOCX/PPTX editing fidelity verified.
-3. Wire cloud revision publication through the isolated ClamAV scan gate. A failed scan must not create a downloadable history entry; rejected objects must be removed safely.
-4. Add route-level HTTP tests for unauthenticated, cross-owner, invalid path, invalid parent, storage upload failure and signed download denial.
+1. Apply and verify the queue migration to the existing Supabase project only after CI validates the migration and exact feature branch.
+2. Execute the worker integration with live ClamAV and verify clean, EICAR/rejected, timeout, retry, lease-expiry and crash-recovery paths; verify failed/rejected object cleanup.
+3. Complete the cloud-library open flow with an authenticated browser session on a second device/browser and verify original, latest clean revision and parent lineage.
+4. Pass the DOCX and PPTX edit → autosave → save → reopen suite in Chromium, including tables, images, slide master, speaker notes and malformed package rejection.
 5. Verify manual Chrome and Edge behavior, browser quota exhaustion, tab switching, concurrent tabs and refresh during an in-flight autosave.
-6. No production deploy or PR merge without explicit user approval.
+6. Keep Office Studio opt-in until all gates pass. No production deploy or PR merge without explicit user approval.
