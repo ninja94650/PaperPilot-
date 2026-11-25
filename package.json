@@ -21,7 +21,8 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "pdfjs-dist": "6.5.438",
-    "tesseract.js": "7.0.0"
+    "tesseract.js": "7.0.0",
+    "@p10node/office-engine": "https://github.com/p10node/office-engine/releases/download/v0.18.0/p10node-office-engine-0.18.0.tgz"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
