@@ -117,38 +117,17 @@ export async function POST(request: Request) {
   }
 
   const sha256 = createHash("sha256").update(bytes).digest("hex");
-  const { data: published, error: publishError } = await admin.rpc("publish_editor_revision", {
-    p_owner_id: user.id,
-    p_document_id: documentId,
-    p_revision_id: revisionId,
-    p_parent_revision_id: parentRevisionId,
-    p_storage_path: storagePath,
-    p_name: name,
-    p_mime_type: mimeType,
-    p_editor_kind: editorKind,
-    p_size_bytes: bytes.length,
-    p_sha256: sha256
+  const { error: queueError } = await admin.from("editor_revision_scan_jobs").insert({
+    id: revisionId, owner_id: user.id, document_id: documentId, revision_id: revisionId,
+    parent_revision_id: parentRevisionId, storage_path: storagePath, name, mime_type: mimeType,
+    editor_kind: editorKind, size_bytes: bytes.length, sha256, status: "queued"
   });
-
-  if (publishError || !published?.[0]) {
+  if (queueError) {
     await admin.storage.from("documents").remove([storagePath]);
-    const conflict = publishError?.message?.includes("editor_parent_revision_not_found");
-    return NextResponse.json({ error: conflict ? "The parent revision is no longer available. Refresh revision history before saving again." : "Could not publish the immutable Office revision." }, {
-      status: conflict ? 409 : 500
-    });
+    return NextResponse.json({ error: "Could not queue this Office revision for malware inspection." }, { status: 409 });
   }
-
   return NextResponse.json({
-    revision: {
-      id: published[0].revision_id,
-      version: published[0].revision_version,
-      documentId,
-      parentRevisionId,
-      name,
-      mimeType,
-      editorKind,
-      sizeBytes: bytes.length,
-      sha256
-    }
-  }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
+    revision: { id: revisionId, documentId, parentRevisionId, name, mimeType, editorKind, sizeBytes: bytes.length, sha256 },
+    scanStatus: "queued"
+  }, { status: 202, headers: { "Cache-Control": "private, no-store", "Retry-After": "3" } });
 }
