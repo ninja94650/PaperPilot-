@@ -98,7 +98,7 @@ begin
   end loop;
 end;
 $;
-do $$
+do $
 begin
   begin
     insert into storage.objects(bucket_id,name)
