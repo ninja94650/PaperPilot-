@@ -63,11 +63,9 @@ table inet paperpilot_worker_egress {
   chain forward {
     type filter hook forward priority -5; policy accept;
     ip saddr $PAPERPILOT_WORKER_EGRESS_IP ip daddr $PAPERPILOT_EGRESS_GATEWAY drop
-    ip saddr $PAPERPILOT_WORKER_EGRESS_IP ct state established,related accept
     ip saddr $PAPERPILOT_WORKER_EGRESS_IP ip daddr @worker_destinations tcp dport 443 accept
     ip saddr $PAPERPILOT_WORKER_EGRESS_IP drop
     ip saddr $PAPERPILOT_CLAMAV_EGRESS_IP ip daddr $PAPERPILOT_EGRESS_GATEWAY drop
-    ip saddr $PAPERPILOT_CLAMAV_EGRESS_IP ct state established,related accept
     ip saddr $PAPERPILOT_CLAMAV_EGRESS_IP ip daddr @clamav_destinations tcp dport 443 accept
     ip saddr $PAPERPILOT_CLAMAV_EGRESS_IP drop
   }
