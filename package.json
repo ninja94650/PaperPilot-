@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test:security": "node --test tests/security/*.test.mjs"
+    "test:security": "node --test tests/security/*.test.mjs",
+    "test:http": "node --experimental-strip-types --experimental-test-module-mocks --experimental-loader ./tests/http/ts-alias-loader.mjs --test tests/http/processing-routes.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.7.0",
