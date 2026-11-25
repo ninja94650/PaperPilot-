@@ -1,4 +1,5 @@
 name: PaperPilot CI
+# Keep full regression checks active for feature branches before PR merge.
 
 on:
   pull_request:
