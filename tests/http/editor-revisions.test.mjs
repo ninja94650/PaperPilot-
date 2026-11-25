@@ -13,6 +13,7 @@ const state = {
   rate: { allowed: true, retryAfterSeconds: 60 },
   document: { id: DOCUMENT, owner_id: OWNER, status: "uploaded", mime_type: WORD_MIME },
   revisions: [],
+  revision: null,
   object: new Blob(["not-a-zip"]),
   objectError: null,
   removed: [],
@@ -39,7 +40,11 @@ const client = {
   auth: { getUser: async () => ({ data: { user: state.user }, error: state.authError }) },
   from(table) {
     if (table === "documents") return chain({ data: state.document, error: null });
-    if (table === "editor_revisions") return chain({ data: state.revisions, error: null });
+    if (table === "editor_revisions") return {
+      select() { return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
+      maybeSingle: async () => ({ data: state.revision, error: null }),
+      then(resolve, reject) { return Promise.resolve({ data: state.revisions, error: null }).then(resolve, reject); }
+    };
     return chain({ data: null, error: null });
   },
   storage: {
@@ -111,6 +116,7 @@ function reset() {
   state.rate = { allowed: true, retryAfterSeconds: 60 };
   state.document = { id: DOCUMENT, owner_id: OWNER, status: "uploaded", mime_type: WORD_MIME };
   state.revisions = [];
+  state.revision = null;
   state.object = new Blob(["not-a-zip"]);
   state.objectError = null;
   state.removed = [];
@@ -176,7 +182,7 @@ test("revision downloads are owner-scoped and use short-lived private URLs", asy
   assert.equal(state.signedCalls, 0);
 
   state.user = { id: OWNER };
-  state.revisions = [{ storage_path: payload().storagePath, name: "saved.docx", mime_type: WORD_MIME }];
+  state.revision = { storage_path: payload().storagePath, name: "saved.docx", mime_type: WORD_MIME };
   response = await downloadRoute.GET(request("/api/editor/revisions/" + REVISION + "/download"), context());
   assert.equal(response.status, 302);
   assert.equal(response.headers.get("cache-control"), "private, no-store");
