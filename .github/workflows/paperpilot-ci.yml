@@ -260,7 +260,7 @@ jobs:
           OFFICE_E2E_URL: http://127.0.0.1:4173
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/paperpilot-office-tools/node_modules/.bin/vite" --root tests/office/e2e --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/office-vite.log" 2>&1 &
+          "$RUNNER_TEMP/paperpilot-office-tools/node_modules/.bin/vite" tests/office/e2e --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/office-vite.log" 2>&1 &
           VITE_PID=$!
           trap 'kill "$VITE_PID" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 60); do
