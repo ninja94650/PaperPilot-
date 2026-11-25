@@ -46,6 +46,7 @@ test("host egress policy is allowlist-only and requires explicit apply", () => {
   assert.match(firewall, /tcp dport 443 accept/);
   assert.match(firewall, /ip saddr \$PAPERPILOT_WORKER_EGRESS_IP drop/);
   assert.match(firewall, /ip saddr \$PAPERPILOT_CLAMAV_EGRESS_IP drop/);
+  assert.match(firewall, /chain input/);
   assert.match(firewall, /--apply/);
   assert.match(firewall, /DRY RUN/);
   const syntax = spawnSync("bash", ["-n", new URL("./egress-firewall.sh", import.meta.url).pathname], { encoding: "utf8" });
