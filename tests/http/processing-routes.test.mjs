@@ -9,7 +9,7 @@ const state = {
   owned: {},
   ownedCalls: [],
   events: [{ event_type: "created", status: "queued", progress_percent: 0, message: "created", created_at: "2026-01-01T00:00:00Z" }],
-  document: { id: "doc-a", name: "source.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size_bytes: 1024, storage_path: "user-a/doc-a/source.docx", status: "ready" },
+  document: { id: "11111111-1111-4111-8111-111111111111", name: "source.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size_bytes: 1024, storage_path: "user-a/doc-a/source.docx", status: "ready" },
   existing: null,
   insertedJob: { id: "job-new", status: "queued", progress_percent: 0, created_at: "2026-01-01T00:00:00Z" },
   cancelledJob: { id: "job-a", status: "cancelled", cancel_requested_at: "2026-01-01T00:00:00Z", progress_message: "Cancelled" },
@@ -134,7 +134,7 @@ function reset() {
   state.owned = {};
   state.ownedCalls = [];
   state.adminWrites = [];
-  state.document = { id: "doc-a", name: "source.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size_bytes: 1024, storage_path: "user-a/doc-a/source.docx", status: "ready" };
+  state.document = { id: "11111111-1111-4111-8111-111111111111", name: "source.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size_bytes: 1024, storage_path: "user-a/doc-a/source.docx", status: "ready" };
   state.existing = null;
   state.signed = { signedUrl: "https://private.example/signed" };
   state.signedError = null;
@@ -175,34 +175,34 @@ test("job status fails closed when rate-limit protection is unavailable or exhau
 test("job creation requires authentication and rejects a document outside the caller's tenant", async () => {
   state.user = null;
   let response = await jobsRoute.POST(request("/api/processing/jobs", "POST", {
-    documentId: "doc-a", tool: "office-to-pdf", idempotencyKey: "request-1234"
+    documentId: "11111111-1111-4111-8111-111111111111", tool: "office-to-pdf", idempotencyKey: "request-1234"
   }));
   assert.equal(response.status, 401);
 
   state.user = { id: "user-a" };
   state.document = null;
   response = await jobsRoute.POST(request("/api/processing/jobs", "POST", {
-    documentId: "doc-b", tool: "office-to-pdf", idempotencyKey: "request-1234"
+    documentId: "22222222-2222-4222-8222-222222222222", tool: "office-to-pdf", idempotencyKey: "request-1234"
   }));
   assert.equal(response.status, 404);
 });
 
 test("job creation validates payload, reuses idempotency keys and inserts owner-bound jobs", async () => {
   let response = await jobsRoute.POST(request("/api/processing/jobs", "POST", {
-    documentId: "doc-a", tool: "unsupported", idempotencyKey: "request-1234"
+    documentId: "11111111-1111-4111-8111-111111111111", tool: "unsupported", idempotencyKey: "request-1234"
   }));
   assert.equal(response.status, 400);
 
-  state.existing = { id: "job-existing", document_id: "doc-a", tool: "office-to-pdf", status: "queued" };
+  state.existing = { id: "job-existing", document_id: "11111111-1111-4111-8111-111111111111", tool: "office-to-pdf", status: "queued" };
   response = await jobsRoute.POST(request("/api/processing/jobs", "POST", {
-    documentId: "doc-a", tool: "office-to-pdf", idempotencyKey: "request-1234"
+    documentId: "11111111-1111-4111-8111-111111111111", tool: "office-to-pdf", idempotencyKey: "request-1234"
   }));
   assert.equal(response.status, 200);
   assert.equal((await response.json()).reused, true);
 
   state.existing = null;
   response = await jobsRoute.POST(request("/api/processing/jobs", "POST", {
-    documentId: "doc-a", tool: "office-to-pdf", idempotencyKey: "request-5678"
+    documentId: "11111111-1111-4111-8111-111111111111", tool: "office-to-pdf", idempotencyKey: "request-5678"
   }));
   assert.equal(response.status, 202);
   assert.equal(state.adminWrites.find(item => item.table === "processing_jobs" && item.kind === "insert").value.owner_id, "user-a");
@@ -223,7 +223,7 @@ test("download never signs a cross-tenant output and returns a short-lived priva
   assert.equal(response.status, 404);
   assert.equal(state.signedCalls, 0);
 
-  state.owned["processing_jobs:job-a:id"] = { id: "job-a", status: "succeeded", document_id: "doc-a" };
+  state.owned["processing_jobs:job-a:id"] = { id: "job-a", status: "succeeded", document_id: "11111111-1111-4111-8111-111111111111" };
   state.owned["document_revisions:job-a:processing_job_id"] = { storage_path: "user-a/job-a/attempt-1/result.pdf", mime_type: "application/pdf", version: 1 };
   response = await downloadRoute.GET(request("/api/processing/jobs/job-a/download"), context());
   assert.equal(response.status, 200);
