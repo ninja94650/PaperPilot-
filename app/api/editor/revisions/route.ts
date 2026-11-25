@@ -35,7 +35,14 @@ export async function GET(request: Request) {
     const { data: pending, error: pendingError } = await admin.from("editor_revision_scan_jobs")
       .select("status,error_code").eq("revision_id", revisionId).eq("owner_id", user.id).maybeSingle();
     if (pendingError) return NextResponse.json({ error: "Could not read revision scan status." }, { status: 500 });
-    if (pending) return NextResponse.json({ scanStatus: pending.status, errorCode: pending.error_code }, { headers: { "Cache-Control": "private, no-store" } });
+    if (pending) {
+      if (pending.status === "clean") {
+        const { data: published } = await supabase.from("editor_revisions").select("id,version").eq("id", revisionId).maybeSingle();
+        if (!published) return NextResponse.json({ error: "Published revision metadata is unavailable." }, { status: 503 });
+        return NextResponse.json({ scanStatus: "clean", revision: published }, { headers: { "Cache-Control": "private, no-store" } });
+      }
+      return NextResponse.json({ scanStatus: pending.status, errorCode: pending.error_code }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     const { data: published } = await supabase.from("editor_revisions").select("id,version").eq("id", revisionId).maybeSingle();
     return published ? NextResponse.json({ scanStatus: "clean", revision: published }, { headers: { "Cache-Control": "private, no-store" } })
       : NextResponse.json({ error: "Revision not found." }, { status: 404 });
