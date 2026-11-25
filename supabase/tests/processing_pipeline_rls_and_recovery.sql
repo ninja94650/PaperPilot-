@@ -91,8 +91,13 @@ begin
     select 'owner-a',allowed,remaining,retry_after_seconds
     from public.consume_processing_api_rate_limit('job:create');
   end loop;
+  for v_attempt in 1..11 loop
+    insert into paperpilot_rate_limit_results(owner_label,allowed,remaining,retry_after_seconds)
+    select 'editor-a',allowed,remaining,retry_after_seconds
+    from public.consume_processing_api_rate_limit('editor:revision');
+  end loop;
 end;
-$$;
+$;
 do $$
 begin
   begin
@@ -109,6 +114,9 @@ select set_config('request.jwt.claim.sub',(select owner_b::text from paperpilot_
 insert into paperpilot_rate_limit_results(owner_label,allowed,remaining,retry_after_seconds)
 select 'owner-b',allowed,remaining,retry_after_seconds
 from public.consume_processing_api_rate_limit('job:create');
+insert into paperpilot_rate_limit_results(owner_label,allowed,remaining,retry_after_seconds)
+select 'editor-b',allowed,remaining,retry_after_seconds
+from public.consume_processing_api_rate_limit('editor:revision');
 insert into paperpilot_rls_assertions
 select (select count(*)=1 from public.processing_jobs where id=(select job_b from paperpilot_fixture_ids));
 insert into paperpilot_rls_assertions
@@ -140,6 +148,11 @@ begin
      or (select count(*) from paperpilot_rate_limit_results where owner_label='owner-a' and not allowed) <> 1
      or not exists (select 1 from paperpilot_rate_limit_results where owner_label='owner-b' and allowed and remaining=9) then
     raise exception 'Per-user processing API rate limits did not enforce the expected quotas';
+  end if;
+  if (select count(*) from paperpilot_rate_limit_results where owner_label='editor-a' and allowed) <> 10
+     or (select count(*) from paperpilot_rate_limit_results where owner_label='editor-a' and not allowed) <> 1
+     or not exists (select 1 from paperpilot_rate_limit_results where owner_label='editor-b' and allowed and remaining=9) then
+    raise exception 'Per-user Office revision rate limits did not enforce the expected quotas';
   end if;
   if (select count(*) from paperpilot_claimed_jobs) <> 1
      or not exists (
