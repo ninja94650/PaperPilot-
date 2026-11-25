@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowDownToLine, CloudUpload, FileText, LoaderCircle, Trash2 } from "lucide-react";
+import { ArrowDownToLine, CloudUpload, FileText, LoaderCircle, Trash2, Pencil } from "lucide-react";
 import OnlyOfficeLauncher from "@/components/onlyoffice-launcher";
 
 type DocumentRow = { id: string; name: string; storage_path: string; mime_type: string; size_bytes: number; status: string; created_at: string };
@@ -123,6 +123,6 @@ export default function CloudLibrary({ initialDocuments }: { initialDocuments: D
     {notice && <p className="cloud-notice" role="status">{notice}</p>}
     {busy && <p className="cloud-busy"><LoaderCircle className="spin" size={14} /> {progress === null ? "Working securely…" : "Uploading " + progress + "%"}</p>}
     {progress !== null && <div className="cloud-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><span style={{ width: progress + "%" }} /></div>}
-    {!documents.length ? <div className="cloud-empty"><FileText size={25} /><b>Your library is ready</b><p>Upload a document to keep it in your private cloud history.</p></div> : <div className="cloud-documents">{documents.map((row) => <article key={row.id} className="cloud-document"><span className="cloud-file-icon"><FileText size={19} /></span><span className="cloud-file-meta"><b>{row.name}</b><small>{(Number(row.size_bytes) / 1024 / 1024).toFixed(2)} MB · {new Date(row.created_at).toLocaleDateString()} · {row.status}</small></span><button title="Download" disabled={busy} onClick={() => void download(row)}><ArrowDownToLine size={16} /></button><button title="Delete" disabled={busy} onClick={() => void remove(row)}><Trash2 size={16} /></button>{/\.(docx?|pptx?)$/i.test(row.name) && <OnlyOfficeLauncher documentId={row.id} />}</article>)}</div>}
+    {!documents.length ? <div className="cloud-empty"><FileText size={25} /><b>Your library is ready</b><p>Upload a document to keep it in your private cloud history.</p></div> : <div className="cloud-documents">{documents.map((row) => <article key={row.id} className="cloud-document"><span className="cloud-file-icon"><FileText size={19} /></span><span className="cloud-file-meta"><b>{row.name}</b><small>{(Number(row.size_bytes) / 1024 / 1024).toFixed(2)} MB · {new Date(row.created_at).toLocaleDateString()} · {row.status}</small></span><button title="Download" disabled={busy} onClick={() => void download(row)}><ArrowDownToLine size={16} /></button><button title="Delete" disabled={busy} onClick={() => void remove(row)}><Trash2 size={16} /></button>{/\.(docx?|pptx?)$/i.test(row.name) && <OnlyOfficeLauncher documentId={row.id} />}{/\.(docx|pptx)$/i.test(row.name) && <button title="Open in PaperPilot Office Studio" disabled={busy} onClick={() => { window.location.href = "/?openCloudDocument=" + encodeURIComponent(row.id); }}><Pencil size={16} /></button>}</article>)}</div>}
   </section>;
 }
