@@ -1,0 +1,111 @@
+services:
+  clamav:
+    image: clamav/clamav:1.5
+    restart: unless-stopped
+    expose:
+      - "3310"
+    networks:
+      worker-egress:
+        ipv4_address: ${PAPERPILOT_CLAMAV_EGRESS_IP:-172.30.42.11}
+        gw_priority: 1
+      worker-private:
+        ipv4_address: ${PAPERPILOT_CLAMAV_PRIVATE_IP:-172.30.43.11}
+        gw_priority: 0
+    volumes:
+      - clamav-db:/var/lib/clamav
+    mem_limit: 4g
+    cpus: 1
+    pids_limit: 100
+    security_opt:
+      - no-new-privileges:true
+
+  paperpilot-converter:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - clamav
+    environment:
+      PORT: "8080"
+      DOCUMENT_WORKER_TOKEN: ${DOCUMENT_WORKER_TOKEN:?Set a long random token}
+      MAX_CONCURRENT_JOBS: "1"
+      CONVERSION_TIMEOUT_MS: "90000"
+      CLAMAV_HOST: ${PAPERPILOT_CLAMAV_PRIVATE_IP:-172.30.43.11}
+      CLAMAV_PORT: "3310"
+      PAPERPILOT_API_URL: ${PAPERPILOT_API_URL:?Set the PaperPilot application URL}
+      PAPERPILOT_WORKER_ID: ${PAPERPILOT_WORKER_ID:-office-worker-1}
+    networks:
+      worker-egress:
+        ipv4_address: ${PAPERPILOT_WORKER_EGRESS_IP:-172.30.42.10}
+        gw_priority: 1
+      worker-private:
+        ipv4_address: ${PAPERPILOT_WORKER_PRIVATE_IP:-172.30.43.10}
+        gw_priority: 0
+    ports:
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=768m,mode=1777
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 120
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/readyz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 7s
+      retries: 3
+      start_period: 45s
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    restart: unless-stopped
+    depends_on:
+      paperpilot-converter:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=1GB
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - worker-private
+    ports:
+      - "127.0.0.1:9090:9090"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 100
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  worker-private:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${PAPERPILOT_PRIVATE_SUBNET:-172.30.43.0/24}
+  worker-egress:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${PAPERPILOT_EGRESS_SUBNET:-172.30.42.0/24}
+
+volumes:
+  clamav-db:
+  prometheus-data:

@@ -1,0 +1,276 @@
+name: PaperPilot CI
+# Keep full regression checks active for feature branches before PR merge.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - "feature/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paperpilot-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
+      - name: Install root dependencies from lockfile
+        run: npm ci
+      - name: Install worker dependencies from lockfile
+        run: npm ci --prefix worker
+      - name: Audit root dependencies
+        run: npm audit --audit-level=high
+      - name: Audit worker dependencies
+        working-directory: worker
+        run: npm audit --audit-level=high
+      - name: API ownership and IDOR regression tests
+        run: npm run test:security
+      - name: HTTP-level API authorization suite
+        run: npm run test:http
+      - name: Document format detection and editor routing tests
+        run: npm run test:documents
+      - name: Searchable OCR PDF text-layer tests
+        run: npm run test:ocr
+      - name: Worker input validation tests
+        working-directory: worker
+        run: npm test
+      - name: Type check
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+
+  database-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: paperpilot-ci
+          POSTGRES_DB: paperpilot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d paperpilot_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: paperpilot-ci
+      DATABASE_URL: postgresql://postgres:paperpilot-ci@localhost:5432/paperpilot_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Bootstrap isolated Supabase-compatible schema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap_disposable_postgres.sql
+      - name: Apply secure processing migrations
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124160750_paperpilot_secure_processing_pipeline.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124160930_paperpilot_processing_scan_leases.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124161225_paperpilot_scan_lease_exhaustion.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124161331_paperpilot_cancel_expired_processing_jobs.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124162518_paperpilot_processing_least_privilege_grants.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124163000_paperpilot_atomic_revision_publish.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124170000_paperpilot_processing_api_rate_limits.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125150000_paperpilot_editor_revisions.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125160000_paperpilot_office_source_mime_types.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125170000_paperpilot_editor_revision_rate_limit.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125180000_paperpilot_editor_revision_clamav_queue.sql
+      - name: Execute cross-tenant RLS, lease recovery and API rate-limit fixture
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/processing_pipeline_rls_and_recovery.sql
+      - name: Execute immutable editor revision and tenant isolation fixture
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/editor_revisions_rls_and_publish.sql
+
+  clamav-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      clamav:
+        image: clamav/clamav:1.4
+        ports:
+          - 3310:3310
+    env:
+      CLAMAV_INTEGRATION: "1"
+      CLAMAV_HOST: 127.0.0.1
+      CLAMAV_PORT: "3310"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - name: Install worker dependencies from lockfile
+        run: npm ci --prefix worker
+      - name: Wait for ClamAV and its loaded signature database
+        run: |
+          node --input-type=module <<'NODE'
+          import { getClamAvVersion } from "./worker/clamav.mjs";
+          const deadline = Date.now() + 300000;
+          let lastError;
+          while (Date.now() < deadline) {
+            try {
+              const version = await getClamAvVersion({ host: process.env.CLAMAV_HOST, port: Number(process.env.CLAMAV_PORT) });
+              console.log("ClamAV ready:", version);
+              process.exit(0);
+            } catch (error) {
+              lastError = error;
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+          }
+          console.error("ClamAV did not become ready:", lastError);
+          process.exit(1);
+          NODE
+      - name: Run live EICAR detection and clean-PDF scanner tests
+        run: npm --prefix worker test
+
+  office-conversion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Validate hardened worker Compose configuration
+        env:
+          DOCUMENT_WORKER_TOKEN: "ci-only-not-a-secret-token-long-enough-for-compose"
+          PAPERPILOT_API_URL: "https://paperpilot.invalid"
+        run: docker compose -f worker/compose.yaml config --quiet
+      - name: Validate Prometheus configuration and alert rules
+        run: |
+          docker run --rm \
+            -v "$PWD/worker/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$PWD/worker/alerts.yml:/etc/prometheus/alerts.yml:ro" \
+            --entrypoint promtool prom/prometheus:v3.2.1 \
+            check config /etc/prometheus/prometheus.yml
+          docker run --rm \
+            -v "$PWD/worker/alerts.yml:/etc/prometheus/alerts.yml:ro" \
+            --entrypoint promtool prom/prometheus:v3.2.1 \
+            check rules /etc/prometheus/alerts.yml
+      - name: Build the isolated LibreOffice worker image
+        run: docker build --tag paperpilot-worker-ci ./worker
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install open-source Office fixture generators
+        run: |
+          python -m venv "$RUNNER_TEMP/paperpilot-venv"
+          "$RUNNER_TEMP/paperpilot-venv/bin/pip" install --disable-pip-version-check python-docx==1.1.2 python-pptx==1.0.2
+      - name: Generate synthetic DOCX and PPTX inputs
+        run: |
+          mkdir -p "$RUNNER_TEMP/paperpilot-office/input" "$RUNNER_TEMP/paperpilot-office/legacy" "$RUNNER_TEMP/paperpilot-office/output"
+          "$RUNNER_TEMP/paperpilot-venv/bin/python" <<'PY'
+          from docx import Document
+          from pptx import Presentation
+          from pptx.util import Inches
+          from pathlib import Path
+          root = Path(__import__("os").environ["RUNNER_TEMP"]) / "paperpilot-office" / "input"
+          doc = Document()
+          doc.add_heading("PaperPilot synthetic conversion fixture", level=1)
+          doc.add_paragraph("Synthetic DOCX input for isolated LibreOffice conversion testing.")
+          doc.save(root / "sample.docx")
+          presentation = Presentation()
+          slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+          box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(2))
+          box.text = "PaperPilot synthetic PPTX conversion fixture"
+          presentation.save(root / "slides.pptx")
+          PY
+      - name: Create legacy DOC and PPT fixtures
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/paperpilot-office:/fixtures" --entrypoint soffice paperpilot-worker-ci --headless -env:UserInstallation=file:///tmp/lo-legacy-doc --convert-to doc --outdir /fixtures/legacy /fixtures/input/sample.docx
+          docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/paperpilot-office:/fixtures" --entrypoint soffice paperpilot-worker-ci --headless -env:UserInstallation=file:///tmp/lo-legacy-ppt --convert-to ppt --outdir /fixtures/legacy /fixtures/input/slides.pptx
+          mv "$RUNNER_TEMP/paperpilot-office/legacy/sample.doc" "$RUNNER_TEMP/paperpilot-office/legacy/legacy-doc.doc"
+          mv "$RUNNER_TEMP/paperpilot-office/legacy/slides.ppt" "$RUNNER_TEMP/paperpilot-office/legacy/legacy-ppt.ppt"
+      - name: Convert all four Office formats to PDF
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/paperpilot-office:/fixtures" --entrypoint soffice paperpilot-worker-ci --headless -env:UserInstallation=file:///tmp/lo-to-pdf --convert-to pdf --outdir /fixtures/output /fixtures/input/sample.docx /fixtures/input/slides.pptx /fixtures/legacy/legacy-doc.doc /fixtures/legacy/legacy-ppt.ppt
+      - name: Verify real PDF outputs for DOC, DOCX, PPT and PPTX
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ["RUNNER_TEMP"]) / "paperpilot-office"
+          outputs = list((root / "output").glob("*.pdf"))
+          assert len(outputs) == 4, f"expected 4 PDFs, found {[p.name for p in outputs]}"
+          for path in outputs:
+              data = path.read_bytes()
+              assert data.startswith(b"%PDF-"), f"{path.name} is not a PDF"
+              assert len(data) > 500, f"{path.name} is unexpectedly small"
+          assert {p.name for p in outputs} == {"sample.pdf", "slides.pdf", "legacy-doc.pdf", "legacy-ppt.pdf"}, [p.name for p in outputs]
+          print("Validated four non-empty PDF outputs from DOC, DOCX, PPT and PPTX fixtures.")
+          PY
+      - name: Exercise queue-to-storage integration with real LibreOffice
+        run: |
+          docker run --rm --network host --user "$(id -u):$(id -g)" \
+            -e PAPERPILOT_E2E_INPUT=/fixtures/input/sample.docx \
+            -v "$RUNNER_TEMP/paperpilot-office:/fixtures:ro" \
+            --entrypoint node paperpilot-worker-ci /app/queue-to-storage.integration.mjs
+
+  office-browser-roundtrip:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install application dependencies from lockfile
+        run: npm ci
+      - name: Install pinned Office fixture dependencies
+        run: python -m pip install --disable-pip-version-check python-docx==1.1.2 python-pptx==1.0.2
+      - name: Install isolated browser test tools
+        run: npm install --prefix "$RUNNER_TEMP/paperpilot-office-tools" --no-save --no-package-lock vite@8.3.5 playwright-core@1.57.0
+      - name: Install Chromium
+        run: node "$RUNNER_TEMP/paperpilot-office-tools/node_modules/playwright-core/cli.js" install --with-deps chromium
+      - name: Generate rich and malformed Office fixtures
+        run: python tests/office/generate-fixtures.py
+      - name: Validate malformed and hostile Office archives
+        run: node --test tests/office/archive-validation.test.mjs
+      - name: Run DOCX/PPTX edit-save-reopen browser round trips
+        env:
+          OFFICE_E2E_TOOLS: ${{ runner.temp }}/paperpilot-office-tools
+          OFFICE_E2E_URL: http://127.0.0.1:4173
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/paperpilot-office-tools/node_modules/.bin/vite" tests/office/e2e --config tests/office/e2e/vite.config.mjs --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/office-vite.log" 2>&1 &
+          VITE_PID=$!
+          trap 'kill "$VITE_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:4173/ >/dev/null || { cat "$RUNNER_TEMP/office-vite.log"; exit 1; }
+          curl --silent --show-error --fail http://127.0.0.1:4173/main.tsx >/dev/null || { echo "---- Vite transform diagnostics ----"; cat "$RUNNER_TEMP/office-vite.log"; exit 1; }
+          if ! node --test tests/office/e2e.test.mjs; then
+            echo "---- Vite server diagnostics ----"
+            cat "$RUNNER_TEMP/office-vite.log"
+            exit 1
+          fi

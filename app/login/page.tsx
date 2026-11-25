@@ -24,7 +24,7 @@ export default function LoginPage() {
         if (data.session) router.push("/account");
         else setMessage("Check your inbox to confirm your email, then sign in.");
       } else if (mode === "reset") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/auth/callback?next=/account" });
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/auth/callback?next=/update-password" });
         if (error) throw error;
         setMessage("If an account exists for that email, a password-reset link is on its way.");
       } else {
