@@ -36,8 +36,8 @@ function command(host, port, payload, timeoutMs = 30_000) {
   });
 }
 
-export async function getClamAvVersion({ host = process.env.CLAMAV_HOST || "clamav", port = Number(process.env.CLAMAV_PORT || 3310) } = {}) {
-  const result = await command(host, port, "zVERSION");
+export async function getClamAvVersion({ host = process.env.CLAMAV_HOST || "clamav", port = Number(process.env.CLAMAV_PORT || 3310), timeoutMs = 5_000 } = {}) {
+  const result = await command(host, port, "zVERSION", timeoutMs);
   if (!result.startsWith("ClamAV ")) throw new Error("ClamAV returned an unexpected version response.");
   return result.slice(0, 120);
 }
