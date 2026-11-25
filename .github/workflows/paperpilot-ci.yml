@@ -144,6 +144,17 @@ jobs:
           DOCUMENT_WORKER_TOKEN: "ci-only-not-a-secret-token-long-enough-for-compose"
           PAPERPILOT_API_URL: "https://paperpilot.invalid"
         run: docker compose -f worker/compose.yaml config --quiet
+      - name: Validate Prometheus configuration and alert rules
+        run: |
+          docker run --rm \
+            -v "$PWD/worker/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$PWD/worker/alerts.yml:/etc/prometheus/alerts.yml:ro" \
+            --entrypoint promtool prom/prometheus:v3.2.1 \
+            check config /etc/prometheus/prometheus.yml
+          docker run --rm \
+            -v "$PWD/worker/alerts.yml:/etc/prometheus/alerts.yml:ro" \
+            --entrypoint promtool prom/prometheus:v3.2.1 \
+            check rules /etc/prometheus/alerts.yml
       - name: Build the isolated LibreOffice worker image
         run: docker build --tag paperpilot-worker-ci ./worker
       - name: Set up Python
