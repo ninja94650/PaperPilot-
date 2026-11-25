@@ -179,6 +179,12 @@ try {
   clearTimeout(timeoutHandle);
   assert.equal(result.body.jobId, jobId);
   assert.ok(result.outputBytes > 500, "converted PDF should contain a real document");
+  const ready = await fetch("http://127.0.0.1:" + workerPort + "/readyz");
+  assert.equal(ready.status, 200, "worker readiness should confirm the scanner is reachable");
+  const metricsResponse = await fetch("http://127.0.0.1:" + workerPort + "/metrics");
+  const metricsText = await metricsResponse.text();
+  assert.match(metricsText, /paperpilot_worker_scans_total\\{result="clean"\\} 2/);
+  assert.match(metricsText, /paperpilot_worker_jobs_total\\{result="succeeded"\\} 1/);
   assert.deepEqual(events.filter(event => ["scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"].includes(event)), [
     "scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"
   ]);
