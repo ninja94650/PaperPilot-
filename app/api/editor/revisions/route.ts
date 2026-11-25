@@ -78,6 +78,17 @@ export async function POST(request: Request) {
   if (sourceError || !source || source.status === "deleted") {
     return NextResponse.json({ error: "Source document not found in your private library." }, { status: 404 });
   }
+  const wordSources = new Set([
+    WORD_MIME, "application/msword", "application/rtf", "text/rtf",
+    "application/vnd.oasis.opendocument.text"
+  ]);
+  const presentationSources = new Set([
+    PPTX_MIME, "application/vnd.ms-powerpoint",
+    "application/vnd.oasis.opendocument.presentation"
+  ]);
+  if (editorKind === "word" ? !wordSources.has(source.mime_type) : !presentationSources.has(source.mime_type)) {
+    return NextResponse.json({ error: "The source document format does not match this editor." }, { status: 409 });
+  }
 
   const { data: object, error: downloadError } = await admin.storage.from("documents").download(storagePath);
   if (downloadError || !object) return NextResponse.json({ error: "Uploaded revision object was not found." }, { status: 404 });
