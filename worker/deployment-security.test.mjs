@@ -21,6 +21,7 @@ test("worker API port and Prometheus UI are loopback-only; metrics are private-n
   assert.match(worker, /127\.0\.0\.1:8080:8080/);
   assert.match(worker, /worker-private:/);
   assert.match(worker, /worker-egress:/);
+  assert.match(worker, /CLAMAV_HOST:.*PAPERPILOT_CLAMAV_PRIVATE_IP/);
   assert.match(worker, /\/readyz/);
   assert.match(monitoring, /127\.0\.0\.1:9090:9090/);
   assert.doesNotMatch(monitoring, /worker-egress/);
