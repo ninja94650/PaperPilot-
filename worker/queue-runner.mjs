@@ -160,6 +160,28 @@ async function scanOne() {
   return true;
 }
 
+async function scanOneEditorRevision() {
+  const claimed = await call("/api/internal/editor-revisions/claim-scan", { workerId });
+  if (!claimed.job) return false;
+  const job = claimed.job;
+  try {
+    const bytes = await download(job.inputUrl, maxInputBytes);
+    const result = await scanDocument(bytes);
+    await call("/api/internal/editor-revisions/scan-result", {
+      jobId: job.id, workerId, attempt: job.attempt,
+      verdict: result.clean ? "clean" : "rejected",
+      signatureVersion: result.signatureVersion || "unavailable"
+    });
+  } catch (error) {
+    await call("/api/internal/editor-revisions/scan-result", {
+      jobId: job.id, workerId, attempt: job.attempt,
+      verdict: "failed", signatureVersion: "unavailable"
+    }).catch(() => {});
+    process.stderr.write("PaperPilot Office revision scan " + job.id + " failed: " + String(error).slice(0,180) + "\\n");
+  }
+  return true;
+}
+
 async function processOne() {
   const claimed = await call("/api/internal/processing/claim", { workerId });
   if (!claimed.job) return false;
