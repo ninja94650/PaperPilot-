@@ -25,7 +25,7 @@ test("invisible OCR text remains extractable from the generated PDF", async () =
     assert.match(text, /PaperPilot/);
     assert.match(text, /searchable OCR/);
   } finally {
-    await parsed.destroy();
+    await loading.destroy();
   }
 });
 
