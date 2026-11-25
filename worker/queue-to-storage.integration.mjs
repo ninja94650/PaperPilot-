@@ -34,6 +34,7 @@ const token = "paperpilot-e2e-token-0123456789-abcdefghijklmnopqrstuvwxyz";
 const events = [];
 let storedOutput = null;
 let scanClaimed = false;
+let editorScanClaimed = false;
 let processingClaimed = false;
 let completionResolve;
 let completionReject;
@@ -60,14 +61,26 @@ const api = createHttpServer(async (request, response) => {
       response.end("ok");
       return;
     }
-    if (request.method !== "POST" || !url.pathname.startsWith("/api/internal/processing/")) {
+    if (request.method !== "POST" || (!url.pathname.startsWith("/api/internal/processing/") && !url.pathname.startsWith("/api/internal/editor-revisions/"))) {
       send(404, { error: "not found" });
       return;
     }
     assert.equal(request.headers.authorization, "Bearer " + token, "worker bearer token must be sent");
     const body = await jsonBody(request);
     const route = url.pathname.split("/").at(-1);
-    events.push(route);
+    const editorScan = url.pathname.startsWith("/api/internal/editor-revisions/");
+    events.push((editorScan ? "editor-" : "") + route);
+    if (editorScan && route === "claim-scan") {
+      if (editorScanClaimed) return send(200, { job: null });
+      editorScanClaimed = true;
+      return send(200, { job: { id: "9a2f6f2a-5f5e-4d53-8f24-4c7d29d4f002", workerId, attempt: 1, inputUrl: "http://127.0.0.1:" + api.address().port + "/fixture.docx" } });
+    }
+    if (editorScan && route === "scan-result") {
+      assert.equal(body.jobId, "9a2f6f2a-5f5e-4d53-8f24-4c7d29d4f002");
+      assert.equal(body.workerId, workerId);
+      assert.equal(body.verdict, "clean", "Office revision must receive a clean ClamAV verdict before publication");
+      return send(200, { ok: true, scanStatus: "clean", revisionId: "9a2f6f2a-5f5e-4d53-8f24-4c7d29d4f002", version: 1 });
+    }
     if (route === "claim-scan") {
       if (scanClaimed) return send(200, { job: null });
       scanClaimed = true;
@@ -183,13 +196,13 @@ try {
   assert.equal(ready.status, 200, "worker readiness should confirm the scanner is reachable");
   const metricsResponse = await fetch("http://127.0.0.1:" + workerPort + "/metrics");
   const metricsText = await metricsResponse.text();
-  assert.ok(metricsText.includes('paperpilot_worker_scans_total{result="clean"} 2'));
+  assert.ok(metricsText.includes('paperpilot_worker_scans_total{result="clean"} 3'));
   assert.ok(metricsText.includes('paperpilot_worker_jobs_total{result="succeeded"} 1'));
-  assert.deepEqual(events.filter(event => ["scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"].includes(event)), [
-    "scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"
+  assert.deepEqual(events.filter(event => ["scan-result", "editor-scan-result", "claim", "editor-claim-scan", "output-upload", "storage:put", "complete", "revision:published"].includes(event)), [
+    "scan-result", "editor-claim-scan", "editor-scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"
   ]);
   assert.equal(events.includes("fail"), false);
-  process.stdout.write("PASS: scanned DOCX -> LibreOffice PDF -> private object upload -> verified revision publication (" + result.outputBytes + " bytes).\n");
+  process.stdout.write("PASS: ClamAV-gated Office revision publication; then scanned DOCX -> LibreOffice PDF -> private object upload -> verified revision publication (" + result.outputBytes + " bytes).\n");
 } catch (error) {
   process.stderr.write(logs + "\n");
   throw error;
