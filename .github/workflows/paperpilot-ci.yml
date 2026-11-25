@@ -268,4 +268,9 @@ jobs:
             sleep 1
           done
           curl --silent --fail http://127.0.0.1:4173/ >/dev/null || { cat "$RUNNER_TEMP/office-vite.log"; exit 1; }
-          node --test tests/office/e2e.test.mjs
+          curl --silent --show-error --fail http://127.0.0.1:4173/main.tsx >/dev/null || { echo "---- Vite transform diagnostics ----"; cat "$RUNNER_TEMP/office-vite.log"; exit 1; }
+          if ! node --test tests/office/e2e.test.mjs; then
+            echo "---- Vite server diagnostics ----"
+            cat "$RUNNER_TEMP/office-vite.log"
+            exit 1
+          fi
