@@ -14,7 +14,9 @@ const state = {
   insertedJob: { id: "job-new", status: "queued", progress_percent: 0, created_at: "2026-01-01T00:00:00Z" },
   cancelledJob: { id: "job-a", status: "cancelled", cancel_requested_at: "2026-01-01T00:00:00Z", progress_message: "Cancelled" },
   signed: { signedUrl: "https://private.example/signed" },
-  signedCalls: 0,\n  signedPaths: [],\n  latestRevision: { id: "22222222-2222-4222-8222-222222222222", version: 4, name: "latest.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", storage_path: "user-a/11111111-1111-4111-8111-111111111111/editor/22222222-2222-4222-8222-222222222222/latest.docx", editor_kind: "word" },
+  signedCalls: 0,
+  signedPaths: [],
+  latestRevision: { id: "22222222-2222-4222-8222-222222222222", version: 4, name: "latest.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", storage_path: "user-a/11111111-1111-4111-8111-111111111111/editor/22222222-2222-4222-8222-222222222222/latest.docx", editor_kind: "word" },
   signedError: null,
   adminConfigured: true,
   adminWrites: []
@@ -52,6 +54,7 @@ const client = {
 };
 const admin = {
   from(table) {
+    if (table === "editor_revisions") return resultChain({ data: state.latestRevision, error: null });
     if (table === "processing_jobs") {
       return {
         select() { return resultChain({ data: state.existing, error: null }); },
@@ -75,6 +78,16 @@ const admin = {
         return Promise.resolve({ error: null });
       }
     };
+  },
+  storage: {
+    from() {
+      return {
+        createSignedUrl: async (path) => {
+          state.signedPaths.push(path);
+          return { data: { signedUrl: "https://private.example/" + encodeURIComponent(path) }, error: null };
+        }
+      };
+    }
   }
 };
 
@@ -105,7 +118,8 @@ mock.module("@/lib/processing/owned-query.mjs", {
 const jobsRoute = await import("../../app/api/processing/jobs/route.ts");
 const statusRoute = await import("../../app/api/processing/jobs/[id]/route.ts");
 const cancelRoute = await import("../../app/api/processing/jobs/[id]/cancel/route.ts");
-const downloadRoute = await import("../../app/api/processing/jobs/[id]/download/route.ts");\nconst cloudOpenRoute = await import("../../app/api/editor/documents/[id]/open/route.ts");
+const downloadRoute = await import("../../app/api/processing/jobs/[id]/download/route.ts");
+const cloudOpenRoute = await import("../../app/api/editor/documents/[id]/open/route.ts");
 
 const internalRoutes = await Promise.all([
   import("../../app/api/internal/processing/claim/route.ts"),
@@ -136,11 +150,13 @@ function reset() {
   state.owned = {};
   state.ownedCalls = [];
   state.adminWrites = [];
-  state.document = { id: "11111111-1111-4111-8111-111111111111", name: "source.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size_bytes: 1024, storage_path: "user-a/doc-a/source.docx", status: "ready" };
+  state.document = { id: "11111111-1111-4111-8111-111111111111", owner_id: "user-a", name: "source.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size_bytes: 1024, storage_path: "user-a/doc-a/source.docx", status: "ready" };
   state.existing = null;
   state.signed = { signedUrl: "https://private.example/signed" };
   state.signedError = null;
   state.signedCalls = 0;
+  state.signedPaths = [];
+  state.latestRevision = { id: "22222222-2222-4222-8222-222222222222", version: 4, name: "latest.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", storage_path: "user-a/11111111-1111-4111-8111-111111111111/editor/22222222-2222-4222-8222-222222222222/latest.docx", editor_kind: "word" };
   state.adminConfigured = true;
   delete process.env.DOCUMENT_WORKER_TOKEN;
 }
