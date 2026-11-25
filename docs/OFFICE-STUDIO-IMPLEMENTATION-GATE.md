@@ -26,3 +26,25 @@ Before enabling Word Studio or Presentation Studio for editing:
 6. Keep the original immutable and preserve the prior revision on callback failure or invalid output.
 
 Until these gates pass, Office files remain safely routed to their format-specific Studio shell and the existing Office-to-PDF conversion remains available. Do not label conversion or a PDF preview as native editing.
+
+
+## Phase D — Image Studio delivered on the feature branch
+
+The browser-local Image Studio is now connected to the format router for PNG, JPEG and WebP:
+- 90-degree rotation in either direction and horizontal flip.
+- Brightness, contrast and saturation adjustments.
+- Proportional resize by output width.
+- PNG, JPEG and WebP export, with quality control for lossy formats.
+- Export creates a separate result file/tab; the uploaded original is not mutated.
+- Unsaved adjustment controls are held in an in-memory WeakMap keyed by the original File object, so switching between image tabs in the same page session restores each image's controls.
+
+Limitations:
+- These in-memory controls do not survive a page refresh, browser close, or navigation away.
+- No automatic cloud autosave is performed. Use the existing account/library save action when you want to upload a resulting file.
+- Browser canvas re-encoding can change metadata and color profiles. JPEG/WebP are lossy; PNG export is lossless relative to the rendered canvas, not a byte-identical copy.
+- Animated WebP/GIF, layered image formats, EXIF orientation edge cases, and color-managed proofing are not supported by this first version.
+- No universal compressor is claimed complete.
+
+## Verification status
+
+The Image Studio source and dashboard integration have been committed to the existing feature branch. The GitHub workflow-run lookup has not yet returned a run for the latest commits, so no build/test pass is claimed here. Required follow-up: run the repository CI build and manually test a large PNG, transparent PNG, JPEG, WebP, rotation/flip combinations, lossy quality changes, and switching away from/back to an edited image tab.
