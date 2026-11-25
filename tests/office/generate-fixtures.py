@@ -1,5 +1,6 @@
 from pathlib import Path
 from io import BytesIO
+import base64
 import os
 import zipfile
 import warnings
@@ -11,11 +12,7 @@ from pptx.util import Inches
 
 ROOT = Path(__file__).parent / "e2e" / "public"
 ROOT.mkdir(parents=True, exist_ok=True)
-PNG = bytes.fromhex(
-    "89504e470d0a1a0a0000000d494844520000000200000002080600000072b60d24"
-    "0000001349444154789c636060f8cfc0c0c0c0c0c0c0000000"
-    "0d1d01032be9a6c80000000049454e44ae426082"
-)
+PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP4z8DAwMDAxMDAwMDAAAANHQEDK+mmyAAAAABJRU5ErkJggg==")
 
 # DOCX: styled paragraphs, a real table, embedded image, header and footer.
 doc = Document()
@@ -58,8 +55,6 @@ prs.save(pptx_path)
 def rewrite_zip(source: Path, target: Path, extra=None, duplicate=None):
     with zipfile.ZipFile(source, "r") as src, zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as out:
         for name in src.namelist():
-            if duplicate == name:
-                continue
             out.writestr(name, src.read(name))
         if extra:
             for name, data in extra:
