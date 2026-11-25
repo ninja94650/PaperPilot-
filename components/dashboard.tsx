@@ -15,7 +15,7 @@ import OfficeStudio from "@/components/office-studio";
 import AdvancedToolDialog from "@/components/advanced-tool-dialog";
 import CloudSaveButton from "@/components/cloud-save-button";
 import { detectDocumentFormat, editorLabel, type EditorKind } from "@/lib/document-format.mjs";
-import { listRecoveredOfficeDrafts } from "@/lib/editor/local-drafts";
+import { createOfficeSessionId, ensureOfficeDraftSession, listRecoveredOfficeDrafts, setOfficeCloudLink } from "@/lib/editor/local-drafts";
 
 type ToolId = "merge" | "split" | "rotate" | "extract" | "annotate" | "sign" | "compress" | "convert" | "ocr";
 type Tool = { id: ToolId; title: string; description: string; icon: typeof FileText; tint: string; ready: boolean; label?: string };
@@ -133,6 +133,45 @@ export default function Dashboard() {
     else if (acceptedCount < valid.length) setNotice("Your workspace can hold up to " + maxFiles + " files at once.");
     else if (valid.length) setNotice(valid.length + " file(s) imported. You can switch between them in the editor.");
   }
+
+  useEffect(() => {
+    const documentId = new URLSearchParams(window.location.search).get("openCloudDocument");
+    if (!documentId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        setNotice("Opening your private cloud document…");
+        const response = await fetch("/api/editor/documents/" + encodeURIComponent(documentId) + "/open", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not open this cloud document.");
+        const [sourceResponse, currentResponse] = await Promise.all([fetch(payload.source.url), fetch(payload.current.url)]);
+        if (!sourceResponse.ok || !currentResponse.ok) throw new Error("The private document download link expired. Try opening it again.");
+        const [sourceBlob, currentBlob] = await Promise.all([sourceResponse.blob(), currentResponse.blob()]);
+        const sourceFile = new File([sourceBlob], payload.source.name, { type: payload.source.mimeType });
+        const currentFile = new File([currentBlob], payload.current.name, { type: payload.current.mimeType });
+        const kind: "word" | "presentation" = payload.kind;
+        const sessionId = await createOfficeSessionId(sourceFile, kind);
+        await ensureOfficeDraftSession(sessionId, sourceFile, kind);
+        await setOfficeCloudLink(sessionId, documentId, payload.parentRevisionId || null);
+        if (cancelled) return;
+        setFiles([currentFile]);
+        setActiveIndex(0);
+        setOfficeSessions(new Map([[currentFile, kind]]));
+        setOfficeSessionIds(new Map([[currentFile, sessionId]]));
+        setOfficeSourceFiles(new Map([[sessionId, sourceFile]]));
+        setOfficeCloudLinks(new Map([[sessionId, { documentId, parentRevisionId: payload.parentRevisionId || null }]]));
+        setEditing(true);
+        setNotice("Opened cloud document · " + (payload.version ? "latest clean revision v" + payload.version : "original version") + ". Autosave and cloud history are connected.");
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("openCloudDocument");
+        window.history.replaceState({}, "", cleanUrl.toString());
+        void routeToFile(currentFile);
+      } catch (error) {
+        if (!cancelled) setNotice(error instanceof Error ? error.message : "Cloud document could not be opened.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   function onInput(event: ChangeEvent<HTMLInputElement>) {
     if (event.target.files) importFiles(event.target.files);
