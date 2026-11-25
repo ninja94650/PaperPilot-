@@ -81,6 +81,7 @@ export async function ensureOfficeDraftSession(sessionId: string, file: File, ki
   const db = await openDatabase();
   try {
     const tx = db.transaction("sessions", "readwrite");
+    const done = transactionDone(tx);
     const store = tx.objectStore("sessions");
     const existing = await requestResult(store.get(sessionId)) as OfficeDraftSession | undefined;
     if (!existing) {
@@ -97,7 +98,7 @@ export async function ensureOfficeDraftSession(sessionId: string, file: File, ki
         updatedAt: Date.now()
       } satisfies OfficeDraftSession);
     }
-    await transactionDone(tx);
+    await done;
     return existing ?? null;
   } catch (error) {
     throw normalizeStorageError(error);
@@ -115,6 +116,7 @@ export async function saveOfficeDraftRevision(input: {
   const db = await openDatabase();
   try {
     const tx = db.transaction(["sessions", "revisions"], "readwrite");
+    const done = transactionDone(tx);
     const sessions = tx.objectStore("sessions");
     const revisions = tx.objectStore("revisions");
     const existing = await requestResult(sessions.get(input.sessionId)) as OfficeDraftSession | undefined;
@@ -143,7 +145,7 @@ export async function saveOfficeDraftRevision(input: {
       updatedAt: Date.now()
     };
     sessions.put(session);
-    await transactionDone(tx);
+    await done;
     return { version, session };
   } catch (error) {
     throw normalizeStorageError(error);
@@ -156,6 +158,7 @@ export async function setOfficeCloudLink(sessionId: string, documentId: string, 
   const db = await openDatabase();
   try {
     const tx = db.transaction("sessions", "readwrite");
+    const done = transactionDone(tx);
     const store = tx.objectStore("sessions");
     const session = await requestResult(store.get(sessionId)) as OfficeDraftSession | undefined;
     if (!session) throw new Error("Local Office draft session is missing.");
@@ -163,7 +166,7 @@ export async function setOfficeCloudLink(sessionId: string, documentId: string, 
     session.parentRevisionId = parentRevisionId;
     session.updatedAt = Date.now();
     store.put(session);
-    await transactionDone(tx);
+    await done;
   } catch (error) {
     throw normalizeStorageError(error);
   } finally {
@@ -175,13 +178,14 @@ export async function updateOfficeCloudParent(sessionId: string, parentRevisionI
   const db = await openDatabase();
   try {
     const tx = db.transaction("sessions", "readwrite");
+    const done = transactionDone(tx);
     const store = tx.objectStore("sessions");
     const session = await requestResult(store.get(sessionId)) as OfficeDraftSession | undefined;
     if (!session) throw new Error("Local Office draft session is missing.");
     session.parentRevisionId = parentRevisionId;
     session.updatedAt = Date.now();
     store.put(session);
-    await transactionDone(tx);
+    await done;
   } catch (error) {
     throw normalizeStorageError(error);
   } finally {
@@ -193,6 +197,7 @@ export async function listRecoveredOfficeDrafts(): Promise<RecoveredOfficeDraft[
   const db = await openDatabase();
   try {
     const tx = db.transaction(["sessions", "revisions"], "readonly");
+    const done = transactionDone(tx);
     const sessions = await requestResult(tx.objectStore("sessions").getAll()) as OfficeDraftSession[];
     const revisionStore = tx.objectStore("revisions");
     const recovered: RecoveredOfficeDraft[] = [];
@@ -211,7 +216,7 @@ export async function listRecoveredOfficeDrafts(): Promise<RecoveredOfficeDraft[
         updatedAt: session.updatedAt
       });
     }
-    await transactionDone(tx);
+    await done;
     return recovered.sort((a, b) => b.updatedAt - a.updatedAt);
   } catch (error) {
     throw normalizeStorageError(error);
