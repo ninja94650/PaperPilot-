@@ -159,6 +159,7 @@ let logs = "";
 child.stdout.on("data", chunk => { logs += chunk.toString(); });
 child.stderr.on("data", chunk => { logs += chunk.toString(); });
 const exited = once(child, "exit");
+let timeoutHandle;
 
 try {
   const deadline = Date.now() + 120_000;
@@ -171,7 +172,6 @@ try {
     } catch { await new Promise(resolveWait => setTimeout(resolveWait, 250)); }
   }
   assert.ok(health, "worker health endpoint did not become ready");
-  let timeoutHandle;
   const result = await Promise.race([
     completion,
     new Promise((_, reject) => { timeoutHandle = setTimeout(() => reject(new Error("queue-to-storage integration timed out")), 120_000); })
@@ -188,8 +188,15 @@ try {
   process.stderr.write(logs + "\n");
   throw error;
 } finally {
+  clearTimeout(timeoutHandle);
   child.kill("SIGTERM");
-  await Promise.race([exited, new Promise(resolveWait => setTimeout(resolveWait, 5000))]);
+  let exitedGracefully = false;
+  await Promise.race([
+    exited.then(() => { exitedGracefully = true; }),
+    new Promise(resolveWait => setTimeout(resolveWait, 2000))
+  ]);
+  if (!exitedGracefully) child.kill("SIGKILL");
+  await exited;
   api.close();
   clamav.close();
 }
