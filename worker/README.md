@@ -50,7 +50,7 @@ The worker uses the same bearer token for its internal API calls. Keep it secret
 - `/healthz` is a liveness endpoint.
 - `/readyz` checks required worker configuration and that ClamAV responds to a bounded version probe. It does not prove the remote PaperPilot API, Supabase database or Storage are reachable.
 - `/metrics` exports low-cardinality Prometheus counters and duration histograms. It deliberately omits user IDs, job IDs, file names, signed URLs and tokens.
-- Prometheus scrapes the worker every 15 seconds. Its UI is bound to `127.0.0.1:9090`; the worker's `/metrics` endpoint is not host-published. Metrics retention is capped at 15 days and 1 GiB.
+- Prometheus scrapes the worker every 15 seconds. Its UI is bound to `127.0.0.1:9090`; the worker's `/metrics` endpoint is not host-published. Metrics retention is capped at 15 days and 1 GiB. `alerts.yml` includes worker scrape, stale polling, repeated job failure, scanner failure and output cleanup rules. No Alertmanager receiver is configured, so rules can become firing alerts in Prometheus but will not notify an operator until a delivery target is explicitly configured.
 - The worker's health check is local to the container. A healthy container is not proof of production SLOs, backups, alert delivery or remote API reachability.
 
 Open the Prometheus UI locally at `http://127.0.0.1:9090`. For a remote host, use an SSH tunnel rather than publishing port 9090 publicly.
@@ -98,7 +98,7 @@ Tests include Office signature/archive validation, fake and live ClamAV checks, 
 
 - The Compose file is a self-hosted reference, not a Vercel deployment. Port 8080 binds to 127.0.0.1 only; port 9090 is also loopback-only. Do not expose either directly to the internet. If remote worker access is needed, use a hardened HTTPS reverse proxy and explicit ingress allowlist.
 - Apply and verify the host nftables egress policy on the actual Docker host. Confirm only the configured API/Supabase and ClamAV update destinations are reachable; test that arbitrary HTTPS, HTTP, SMTP, metadata endpoints and host-gateway services are blocked.
-- Verify Prometheus targets are up, inspect the metrics endpoint from the private network, and configure alert delivery before public launch. Alertmanager rules, external alert delivery, host resource monitoring, signature freshness alerts, backup/restore drills and SLOs remain outstanding.
+- Verify Prometheus targets are up, inspect the metrics endpoint from the private network, and configure alert delivery before public launch. Alertmanager receiver/delivery, host resource monitoring, ClamAV signature freshness alerts, backup/restore drills and SLOs remain outstanding.
 - The legacy synchronous /convert endpoint returns 410 so it cannot bypass the malware-scan queue. The queue runner processes one job at a time per container.
 - ClamAV is GPLv2; review COPYING and third-party notices before redistributing the image. See docs/LICENSING-0.2.1.md.
 - The OOXML validator is a structural/resource gate, not CDR. The worker is not production-approved until security review, sandbox verification and end-to-end tests are complete.
