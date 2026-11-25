@@ -156,15 +156,32 @@ export default function OfficeStudio({
       })
     });
     const payload = await response.json();
-    if (!response.ok) {
+    if (response.status !== 202 || payload.scanStatus !== "queued") {
       await supabase.storage.from("documents").remove([storagePath]);
-      throw new Error(payload.error || "Cloud revision could not be published.");
+      throw new Error(payload.error || "Cloud revision was not accepted for malware inspection.");
     }
-    const publishedId = payload.revision.id as string;
+    setMessage("Cloud revision uploaded and quarantined. Waiting for ClamAV inspection…");
+    let scan: { scanStatus: string; revision?: { id: string; version: number }; errorCode?: string } | null = null;
+    for (let attempt = 0; attempt < 45; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      const statusResponse = await fetch("/api/editor/revisions?revisionId=" + encodeURIComponent(revisionId), { cache: "no-store" });
+      const statusPayload = await statusResponse.json();
+      if (!statusResponse.ok) throw new Error(statusPayload.error || "Could not verify the ClamAV result.");
+      scan = statusPayload;
+      if (scan.scanStatus === "clean") break;
+      if (scan.scanStatus === "rejected" || scan.scanStatus === "failed") {
+        throw new Error(scan.scanStatus === "rejected" ? "ClamAV rejected this Office revision. It was not published." : "ClamAV could not complete inspection. The revision remains unavailable.");
+      }
+    }
+    if (!scan || scan.scanStatus !== "clean" || !scan.revision?.id) {
+      setMessage("Revision remains quarantined while the scanner queue completes. It is not yet in cloud history.");
+      return;
+    }
+    const publishedId = scan.revision.id;
     setParentRevisionId(publishedId);
     await updateOfficeCloudParent(id, publishedId);
     await loadHistory();
-    setMessage("Saved locally and published cloud revision " + payload.revision.version + ".");
+    setMessage("ClamAV inspection passed. Cloud revision " + scan.revision.version + " is now published.");
   }
 
   async function saveRevision(blob: Blob, suggestedName: string) {
