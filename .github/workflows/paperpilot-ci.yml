@@ -190,3 +190,9 @@ jobs:
           assert {p.name for p in outputs} == {"sample.pdf", "slides.pdf", "legacy-doc.pdf", "legacy-ppt.pdf"}, [p.name for p in outputs]
           print("Validated four non-empty PDF outputs from DOC, DOCX, PPT and PPTX fixtures.")
           PY
+      - name: Exercise queue-to-storage integration with real LibreOffice
+        run: |
+          docker run --rm --network host --user "$(id -u):$(id -g)" \
+            -e PAPERPILOT_E2E_INPUT=/fixtures/input/sample.docx \
+            -v "$RUNNER_TEMP/paperpilot-office:/fixtures:ro" \
+            --entrypoint node paperpilot-worker-ci /app/queue-to-storage.integration.mjs
