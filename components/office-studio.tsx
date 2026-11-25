@@ -22,6 +22,19 @@ const mimeByExtension: Record<string, string> = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
+const sourceMimeByExtension: Record<string, string> = {
+  doc: "application/msword",
+  docx: mimeByExtension.docx,
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: mimeByExtension.pptx,
+  odt: "application/vnd.oasis.opendocument.text",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  rtf: "application/rtf"
+};
+function mimeForFile(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  return file.type || sourceMimeByExtension[extension] || "application/octet-stream";
+}
 
 type RevisionRow = {
   id: string;
@@ -197,14 +210,14 @@ export default function OfficeStudio({
       const safeName = original.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "document";
       const storagePath = user.id + "/" + crypto.randomUUID() + "/" + safeName;
       const { error: uploadError } = await supabase.storage.from("documents").upload(storagePath, original, {
-        contentType: original.type || "application/octet-stream",
+        contentType: mimeForFile(original),
         upsert: false
       });
       if (uploadError) throw new Error("Original upload failed: " + uploadError.message);
       const { data: document, error: rowError } = await supabase.from("documents").insert({
         owner_id: user.id,
         name: original.name,
-        mime_type: original.type || "application/octet-stream",
+        mime_type: mimeForFile(original),
         size_bytes: original.size,
         storage_path: storagePath,
         status: "uploaded"
