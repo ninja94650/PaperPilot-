@@ -165,12 +165,12 @@ export default function OfficeStudio({
     for (let attempt = 0; attempt < 45; attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, 2000));
       const statusResponse = await fetch("/api/editor/revisions?revisionId=" + encodeURIComponent(revisionId), { cache: "no-store" });
-      const statusPayload = await statusResponse.json();
+      const statusPayload = await statusResponse.json() as { scanStatus: string; revision?: { id: string; version: number }; errorCode?: string; error?: string };
       if (!statusResponse.ok) throw new Error(statusPayload.error || "Could not verify the ClamAV result.");
       scan = statusPayload;
-      if (scan.scanStatus === "clean") break;
-      if (scan.scanStatus === "rejected" || scan.scanStatus === "failed") {
-        throw new Error(scan.scanStatus === "rejected" ? "ClamAV rejected this Office revision. It was not published." : "ClamAV could not complete inspection. The revision remains unavailable.");
+      if (statusPayload.scanStatus === "clean") break;
+      if (statusPayload.scanStatus === "rejected" || statusPayload.scanStatus === "failed") {
+        throw new Error(statusPayload.scanStatus === "rejected" ? "ClamAV rejected this Office revision. It was not published." : "ClamAV could not complete inspection. The revision remains unavailable.");
       }
     }
     if (!scan || scan.scanStatus !== "clean" || !scan.revision?.id) {
