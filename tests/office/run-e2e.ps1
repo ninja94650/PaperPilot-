@@ -15,7 +15,7 @@ $env:OFFICE_E2E_URL = "http://127.0.0.1:4173"
 $vite = Join-Path $tools "node_modules\.bin\vite.cmd"
 $stdout = Join-Path $env:TEMP "paperpilot-office-vite.stdout.log"
 $stderr = Join-Path $env:TEMP "paperpilot-office-vite.stderr.log"
-$server = Start-Process -FilePath $vite -ArgumentList @("--root", "tests/office/e2e", "--host", "127.0.0.1", "--port", "4173", "--strictPort") -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+$server = Start-Process -FilePath $vite -ArgumentList @("tests/office/e2e", "--host", "127.0.0.1", "--port", "4173", "--strictPort") -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 
 try {
   $ready = $false
