@@ -64,6 +64,19 @@ grant all on public.processing_jobs to service_role;
 
 -- Minimal private Storage object table and folder-owner policies for CI.
 create schema if not exists storage;
+create table storage.buckets (
+  id text primary key,
+  allowed_mime_types text[]
+);
+insert into storage.buckets(id,allowed_mime_types) values (
+  'documents',
+  array[
+    'application/msword','application/pdf','application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg','image/png','image/webp'
+  ]::text[]
+) on conflict (id) do nothing;
 create table storage.objects (
   id uuid primary key default gen_random_uuid(),
   bucket_id text not null,
