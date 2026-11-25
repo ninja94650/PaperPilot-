@@ -4,7 +4,7 @@ The worker has two queue stages: ClamAV inspection, then LibreOffice conversion.
 
 ## Local setup
 
-Requirements: Docker Compose and enough host memory for the scanner (ClamAV's official Docker guidance recommends 4 GiB for the scanner container).
+Requirements: Docker Compose v2.33.1 or newer (for explicit gateway priority) and enough host memory for the scanner (ClamAV's official Docker guidance recommends 4 GiB for the scanner container).
 
 Copy `.env.example` to `.env` and set:
 
@@ -21,7 +21,7 @@ Then run:
 docker compose up --build
 ```
 
-The ClamAV service is reachable only on the private Compose network at clamav:3310. Do not publish that port; clamd's TCP protocol is unencrypted. The converter has a separate egress network for HTTPS calls to PaperPilot and Supabase. Prometheus is attached only to the internal network. The ClamAV database is persisted in the clamav-db volume and is updated by the official image.
+The converter connects to ClamAV through its private-network address on TCP 3310. Do not publish that port; clamd's TCP protocol is unencrypted. ClamAV also has a separate egress attachment for signature updates; the host egress policy limits that address to the configured update host. The converter has its own egress attachment for HTTPS calls to PaperPilot and Supabase. Prometheus is attached only to the internal network. The ClamAV database is persisted in the clamav-db volume and is updated by the official image.
 
 ## Queue flow
 
@@ -57,7 +57,7 @@ Open the Prometheus UI locally at `http://127.0.0.1:9090`. For a remote host, us
 
 ## Host egress policy
 
-The Compose file separates the worker's internal scanner/monitoring network from its HTTPS egress network. Compose alone does not restrict the egress network. A host nftables policy is provided:
+The Compose file separates the worker's internal scanner/monitoring network from its HTTPS egress network. It sets the egress network as the explicit default gateway (Compose v2.33.1+). Compose alone does not restrict the egress network. A host nftables policy is provided:
 
 ```bash
 cd worker
