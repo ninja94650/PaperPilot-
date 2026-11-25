@@ -39,6 +39,8 @@ jobs:
         run: npm audit --audit-level=high
       - name: API ownership and IDOR regression tests
         run: npm run test:security
+      - name: HTTP-level API authorization suite
+        run: npm run test:http
       - name: Worker input validation tests
         working-directory: worker
         run: npm test
