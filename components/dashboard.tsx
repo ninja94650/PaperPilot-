@@ -15,6 +15,7 @@ import OfficeStudio from "@/components/office-studio";
 import AdvancedToolDialog from "@/components/advanced-tool-dialog";
 import CloudSaveButton from "@/components/cloud-save-button";
 import { detectDocumentFormat, editorLabel, type EditorKind } from "@/lib/document-format.mjs";
+import { listRecoveredOfficeDrafts } from "@/lib/editor/local-drafts";
 
 type ToolId = "merge" | "split" | "rotate" | "extract" | "annotate" | "sign" | "compress" | "convert" | "ocr";
 type Tool = { id: ToolId; title: string; description: string; icon: typeof FileText; tint: string; ready: boolean; label?: string };
@@ -76,6 +77,9 @@ export default function Dashboard() {
   const [activeEditorKind, setActiveEditorKind] = useState<EditorKind>("pdf");
   const [formatWarning, setFormatWarning] = useState("");
   const [officeSessions, setOfficeSessions] = useState<Map<File, "word" | "presentation">>(new Map());
+  const [officeSessionIds, setOfficeSessionIds] = useState<Map<File, string>>(new Map());
+  const [officeSourceFiles, setOfficeSourceFiles] = useState<Map<string, File>>(new Map());
+  const [officeCloudLinks, setOfficeCloudLinks] = useState<Map<string, { documentId: string; parentRevisionId: string | null }>>(new Map());
   const routeToken = useRef(0);
 
   const activeFile = files[activeIndex] ?? null;
@@ -92,6 +96,32 @@ export default function Dashboard() {
       void routeToFile(files[activeIndex] ?? files[0]);
     }
   }, [activeAdvancedTool, files.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listRecoveredOfficeDrafts().then((drafts) => {
+      if (cancelled || drafts.length === 0) return;
+      setFiles((current) => {
+        if (current.length > 0) return current;
+        const recovered = drafts.map((draft) => draft.latestFile);
+        setActiveIndex(0);
+        setOfficeSessions(new Map(drafts.map((draft) => [draft.latestFile, draft.kind])));
+        setOfficeSessionIds(new Map(drafts.map((draft) => [draft.latestFile, draft.sessionId])));
+        setOfficeSourceFiles(new Map(drafts.map((draft) => [draft.sessionId, draft.sourceFile])));
+        setOfficeCloudLinks(new Map(drafts.filter((draft) => draft.cloudDocumentId).map((draft) => [draft.sessionId, {
+          documentId: draft.cloudDocumentId!,
+          parentRevisionId: draft.parentRevisionId
+        }])));
+        setEditing(true);
+        setNotice("Recovered " + drafts.length + " Office draft(s) from this browser. Your original files remain preserved.");
+        void routeToFile(recovered[0]);
+        return recovered;
+      });
+    }).catch((error) => {
+      if (!cancelled) setNotice(error instanceof Error ? error.message : "Local Office draft recovery is unavailable.");
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   function importFiles(incoming: FileList | File[]) {
     const selected = Array.from(incoming);
@@ -388,14 +418,53 @@ export default function Dashboard() {
                 </div>}
                 {Array.from(officeSessions.entries()).filter(([sessionFile]) => files.includes(sessionFile)).map(([sessionFile, kind]) => {
                   const activeSession = sessionFile === activeFile && kind === activeEditorKind;
+                  const sessionId = officeSessionIds.get(sessionFile);
+                  const cloudLink = sessionId ? officeCloudLinks.get(sessionId) : undefined;
+                  const sourceFile = sessionId ? officeSourceFiles.get(sessionId) : undefined;
                   return <div key={sessionFile.name + sessionFile.lastModified + files.indexOf(sessionFile)} style={{ position: "absolute", inset: 0, visibility: activeSession ? "visible" : "hidden", pointerEvents: activeSession ? "auto" : "none", zIndex: activeSession ? 2 : 1 }}>
-                    <OfficeStudio file={sessionFile} kind={kind} onSave={(revision) => {
-                      const nextIndex = files.length;
-                      setFiles((current) => [...current, revision]);
-                      setActiveIndex(nextIndex);
-                      void routeToFile(revision);
-                      setNotice("Saved " + revision.name + " as a new revision. The original and previous revisions remain unchanged.");
-                    }} />
+                    <OfficeStudio
+                      file={sessionFile}
+                      sourceFile={sourceFile}
+                      kind={kind}
+                      sessionId={sessionId}
+                      cloudDocumentId={cloudLink?.documentId}
+                      parentRevisionId={cloudLink?.parentRevisionId}
+                      onSessionReady={(id, original) => {
+                        setOfficeSessionIds((current) => new Map(current).set(sessionFile, id));
+                        setOfficeSourceFiles((current) => new Map(current).set(id, original));
+                      }}
+                      onCloudLink={(id, documentId, parentRevisionId) => {
+                        setOfficeCloudLinks((current) => new Map(current).set(id, { documentId, parentRevisionId }));
+                      }}
+                      onSave={(revision, meta) => {
+                        setFiles((current) => {
+                          let index = current.indexOf(sessionFile);
+                          if (index < 0) index = current.findIndex((candidate) => officeSessionIds.get(candidate) === meta.sessionId);
+                          if (index < 0) return [...current, revision];
+                          const nextFiles = [...current];
+                          nextFiles[index] = revision;
+                          return nextFiles;
+                        });
+                        setOfficeSessions((current) => new Map(current).set(revision, kind));
+                        setOfficeSessionIds((current) => new Map(current).set(revision, meta.sessionId));
+                        setOfficeSourceFiles((current) => new Map(current).set(meta.sessionId, sourceFile ?? sessionFile));
+                        if (activeSession) void routeToFile(revision);
+                        setNotice("Autosaved " + revision.name + " locally as revision " + meta.version + ".");
+                      }}
+                      onRestore={(revision, meta) => {
+                        setFiles((current) => {
+                          const index = current.indexOf(sessionFile);
+                          if (index < 0) return current;
+                          const nextFiles = [...current];
+                          nextFiles[index] = revision;
+                          return nextFiles;
+                        });
+                        setOfficeSessions((current) => new Map(current).set(revision, kind));
+                        setOfficeSessionIds((current) => new Map(current).set(revision, meta.sessionId));
+                        setOfficeSourceFiles((current) => new Map(current).set(meta.sessionId, sourceFile ?? sessionFile));
+                        if (activeSession) void routeToFile(revision);
+                      }}
+                    />
                   </div>;
                 })}
               </div>
