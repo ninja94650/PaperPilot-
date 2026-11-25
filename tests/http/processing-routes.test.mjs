@@ -9,12 +9,12 @@ const state = {
   owned: {},
   ownedCalls: [],
   events: [{ event_type: "created", status: "queued", progress_percent: 0, message: "created", created_at: "2026-01-01T00:00:00Z" }],
-  document: { id: "11111111-1111-4111-8111-111111111111", name: "source.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size_bytes: 1024, storage_path: "user-a/doc-a/source.docx", status: "ready" },
+  document: { id: "11111111-1111-4111-8111-111111111111", owner_id: "user-a", name: "source.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size_bytes: 1024, storage_path: "user-a/doc-a/source.docx", status: "ready" },
   existing: null,
   insertedJob: { id: "job-new", status: "queued", progress_percent: 0, created_at: "2026-01-01T00:00:00Z" },
   cancelledJob: { id: "job-a", status: "cancelled", cancel_requested_at: "2026-01-01T00:00:00Z", progress_message: "Cancelled" },
   signed: { signedUrl: "https://private.example/signed" },
-  signedCalls: 0,
+  signedCalls: 0,\n  signedPaths: [],\n  latestRevision: { id: "22222222-2222-4222-8222-222222222222", version: 4, name: "latest.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", storage_path: "user-a/11111111-1111-4111-8111-111111111111/editor/22222222-2222-4222-8222-222222222222/latest.docx", editor_kind: "word" },
   signedError: null,
   adminConfigured: true,
   adminWrites: []
@@ -105,7 +105,7 @@ mock.module("@/lib/processing/owned-query.mjs", {
 const jobsRoute = await import("../../app/api/processing/jobs/route.ts");
 const statusRoute = await import("../../app/api/processing/jobs/[id]/route.ts");
 const cancelRoute = await import("../../app/api/processing/jobs/[id]/cancel/route.ts");
-const downloadRoute = await import("../../app/api/processing/jobs/[id]/download/route.ts");
+const downloadRoute = await import("../../app/api/processing/jobs/[id]/download/route.ts");\nconst cloudOpenRoute = await import("../../app/api/editor/documents/[id]/open/route.ts");
 
 const internalRoutes = await Promise.all([
   import("../../app/api/internal/processing/claim/route.ts"),
@@ -233,6 +233,29 @@ test("download never signs a cross-tenant output and returns a short-lived priva
   assert.equal((await response.json()).url, "https://private.example/signed");
 });
 
+test("cloud Office reopen returns the immutable source and latest clean revision for the owner", async () => {
+  const response = await cloudOpenRoute.GET(request("/api/editor/documents/11111111-1111-4111-8111-111111111111/open"), context("11111111-1111-4111-8111-111111111111"));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.kind, "word");
+  assert.equal(body.source.name, "source.docx");
+  assert.equal(body.current.name, "latest.docx");
+  assert.equal(body.parentRevisionId, "22222222-2222-4222-8222-222222222222");
+  assert.equal(body.version, 4);
+  assert.equal(state.signedPaths.length, 2);
+  assert.ok(state.signedPaths[0].endsWith("/source.docx"));
+  assert.ok(state.signedPaths[1].endsWith("/latest.docx"));
+});
+
+test("cloud Office reopen rejects anonymous and unsupported source documents", async () => {
+  state.user = null;
+  let response = await cloudOpenRoute.GET(request("/api/editor/documents/11111111-1111-4111-8111-111111111111/open"), context("11111111-1111-4111-8111-111111111111"));
+  assert.equal(response.status, 401);
+  state.user = { id: "user-a" };
+  state.document = { ...state.document, mime_type: "application/pdf" };
+  response = await cloudOpenRoute.GET(request("/api/editor/documents/11111111-1111-4111-8111-111111111111/open"), context("11111111-1111-4111-8111-111111111111"));
+  assert.equal(response.status, 415);
+});
 test("worker-only processing endpoints reject missing bearer credentials before touching storage", async () => {
   for (const route of internalRoutes) {
     const response = await route.POST(request("/api/internal/processing", "POST", {}));
