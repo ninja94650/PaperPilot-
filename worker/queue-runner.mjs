@@ -237,6 +237,7 @@ async function sweepOrphanedOutputs() {
       process.stdout.write("PaperPilot output cleanup: " + JSON.stringify(result) + "\n");
     }
   } catch (error) {
+    recordCleanup("error", 1);
     process.stderr.write("PaperPilot output cleanup sweep failed: " + String(error).slice(0,180) + "\n");
   }
 }
