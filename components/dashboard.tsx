@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { addTextToPdf, extractPages, mergePdfs, rotatePages, splitPdf } from "@/lib/pdf-tools";
 import PdfPageWorkspace from "@/components/pdf-page-workspace";
+import ImageStudio from "@/components/image-studio";
 import AdvancedToolDialog from "@/components/advanced-tool-dialog";
 import CloudSaveButton from "@/components/cloud-save-button";
 import { detectDocumentFormat, editorLabel, type EditorKind } from "@/lib/document-format.mjs";
@@ -364,7 +365,7 @@ export default function Dashboard() {
               </div>}
               <div className="preview-stage">
                 {busy && <div className="processing-shade"><LoaderCircle className="spin" size={26} /><b>Updating your document</b><small>Processing locally in your browser</small></div>}
-                {activeFile && activeEditorKind === "pdf" && isPdf(activeFile) ? <PdfPageWorkspace file={activeFile} onChange={updateActiveFile} /> : <div className="empty-preview">
+                {activeFile && activeEditorKind === "pdf" && isPdf(activeFile) ? <PdfPageWorkspace file={activeFile} onChange={updateActiveFile} /> : activeFile && activeEditorKind === "image" ? <ImageStudio file={activeFile} onResult={(result) => { setFiles((current) => [...current, result]); setActiveIndex(files.length); void routeToFile(result); setNotice("Image edits exported as a new revision. The original remains unchanged."); }} /> : <div className="empty-preview">
                   <div className="empty-preview-icon">{activeFile ? <ImageIcon size={28} /> : <FileStack size={28} />}</div>
                   <h3>{activeFile ? (activeEditorKind === "unsupported" ? "Unsupported document format" : editorLabel(activeEditorKind) + " is selected") : "Your canvas is ready"}</h3>
                   <p>{activeFile ? (formatWarning || (activeEditorKind === "word" ? "Routed to Word Studio. Native Word editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "presentation" ? "Routed to Presentation Studio. Native slide editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "image" ? "Routed to Image Studio. Image editing is the next implementation phase; the original remains unchanged." : activeEditorKind === "pdf" ? "This file could not be opened as a PDF. The original remains unchanged." : "This file cannot safely be opened in an editor.")) : "Import a document to begin."}</p>
