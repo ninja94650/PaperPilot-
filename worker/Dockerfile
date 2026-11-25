@@ -14,7 +14,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
-COPY --chown=node:node server.mjs archive-validation.mjs clamav.mjs queue-runner.mjs process-control.mjs ./
+COPY --chown=node:node server.mjs archive-validation.mjs clamav.mjs queue-runner.mjs process-control.mjs queue-to-storage.integration.mjs ./
 
 USER node
 EXPOSE 8080
