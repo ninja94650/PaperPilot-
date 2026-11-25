@@ -86,7 +86,7 @@ export async function ocrPdf(
 ): Promise<OcrResult> {
   const source = await loadPdfForWorkspace(file);
   if (source.numPages > 100) {
-    await source.destroy();
+    await source.cleanup();
     throw new Error("OCR is limited to 100 pages per file in the browser.");
   }
 
@@ -120,7 +120,12 @@ export async function ocrPdf(
         transcriptPages.push("===== Page " + pageNumber + " =====\n" + result.data.text.trim());
 
         if (searchableDocument && font) {
-          const positionedWords = (result.data.words ?? [])
+          const recognizedWords = (result.data.blocks ?? []).flatMap((block) =>
+            block.paragraphs.flatMap((paragraph) =>
+              paragraph.lines.flatMap((line) => line.words)
+            )
+          );
+          const positionedWords = recognizedWords
             .filter((word) => word.confidence >= 20 && word.text.trim())
             .map((word) => {
               const [left, bottom] = viewport.convertToPdfPoint(word.bbox.x0, word.bbox.y1);
@@ -149,7 +154,7 @@ export async function ocrPdf(
     }
   } finally {
     if (worker) await worker.terminate();
-    await source.destroy();
+    await source.cleanup();
   }
 
   const transcriptText = transcriptPages.join("\n\n").trim();
