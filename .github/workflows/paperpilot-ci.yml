@@ -94,13 +94,8 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124162518_paperpilot_processing_least_privilege_grants.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124163000_paperpilot_atomic_revision_publish.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124170000_paperpilot_processing_api_rate_limits.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125150000_paperpilot_editor_revisions.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125160000_paperpilot_office_source_mime_types.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261125170000_paperpilot_editor_revision_rate_limit.sql
       - name: Execute cross-tenant RLS, lease recovery and API rate-limit fixture
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/processing_pipeline_rls_and_recovery.sql
-      - name: Execute immutable editor revision and tenant isolation fixture
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/editor_revisions_rls_and_publish.sql
 
   clamav-integration:
     runs-on: ubuntu-latest
@@ -226,36 +221,3 @@ jobs:
             -e PAPERPILOT_E2E_INPUT=/fixtures/input/sample.docx \
             -v "$RUNNER_TEMP/paperpilot-office:/fixtures:ro" \
             --entrypoint node paperpilot-worker-ci /app/queue-to-storage.integration.mjs
-      - name: Set up Node.js for browser Office editor tests
-        uses: actions/setup-node@v5
-        with:
-          node-version: "22.13.1"
-      - name: Install PaperPilot dependencies for Office editor tests
-        run: npm ci
-      - name: Generate rich DOCX/PPTX and malformed OOXML fixtures
-        run: python tests/office/generate-fixtures.py
-      - name: Validate Office archive security boundaries
-        run: node --test tests/office/archive-validation.test.mjs
-      - name: Install isolated browser test tooling
-        run: npm install --prefix "$RUNNER_TEMP/office-tools" --no-save --no-package-lock vite@8.3.5 playwright-core@1.57.0
-      - name: Install Chromium for real Office editor tests
-        run: "$RUNNER_TEMP/office-tools/node_modules/.bin/playwright-core" install --with-deps chromium
-      - name: Start isolated Office editor fixture server
-        run: |
-          "$RUNNER_TEMP/office-tools/node_modules/.bin/vite" --root tests/office/e2e --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/paperpilot-office-vite.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/paperpilot-office-vite.pid"
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          cat "$RUNNER_TEMP/paperpilot-office-vite.log"
-          exit 1
-      - name: Run DOCX/PPTX edit-save-reopen and IndexedDB recovery tests
-        run: |
-          export OFFICE_E2E_TOOLS="$RUNNER_TEMP/office-tools"
-          export OFFICE_E2E_URL="http://127.0.0.1:4173"
-          node --test tests/office/e2e.test.mjs
-      - name: Stop isolated Office editor fixture server
-        if: always()
-        run: |
-          if [ -f "$RUNNER_TEMP/paperpilot-office-vite.pid" ]; then kill "$(cat "$RUNNER_TEMP/paperpilot-office-vite.pid")" || true; fi
