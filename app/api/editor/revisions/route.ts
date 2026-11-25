@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateOOXMLArchive } from "../../../../worker/archive-validation.mjs";
+import { consumeProcessingRateLimit } from "@/lib/processing/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,15 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 }); }
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
+  try {
+    const limit = await consumeProcessingRateLimit(supabase, "editor:revision");
+    if (!limit.allowed) return NextResponse.json({ error: "Office cloud autosave is rate limited. Please wait before retrying." }, {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfterSeconds), "Cache-Control": "no-store" }
+    });
+  } catch {
+    return NextResponse.json({ error: "Office revision rate limiting is temporarily unavailable." }, { status: 503 });
+  }
 
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; }
