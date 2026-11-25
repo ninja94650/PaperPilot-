@@ -55,6 +55,11 @@ table inet paperpilot_worker_egress {
     flags interval
     elements = { $CLAMAV_DESTINATIONS }
   }
+  chain input {
+    type filter hook input priority -5; policy accept;
+    ip saddr $PAPERPILOT_WORKER_EGRESS_IP drop
+    ip saddr $PAPERPILOT_CLAMAV_EGRESS_IP drop
+  }
   chain forward {
     type filter hook forward priority -5; policy accept;
     ip saddr $PAPERPILOT_WORKER_EGRESS_IP ip daddr $PAPERPILOT_EGRESS_GATEWAY drop
