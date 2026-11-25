@@ -48,11 +48,10 @@ async function replaceDocumentText(page, selector, target, replacement) {
 }
 
 async function saveAndReopen(page) {
-  const save = page.getByRole("button", { name: /^Save/i }).first();
-  await save.waitFor({ state: "visible", timeout: 15000 });
   const previous = await page.evaluate(() => window.__paperpilotOffice.events.filter((event) => event.type === "save").length);
-  await save.click();
   await page.waitForFunction((count) => window.__paperpilotOffice.events.filter((event) => event.type === "save").length > count, previous, { timeout: 30000 });
+  const autoSaved = await page.evaluate(() => window.__paperpilotOffice.events.some((event) => event.type === "dirty" && event.dirty === true));
+  assert.equal(autoSaved, true, "editing must trigger controller-driven idle autosave without clicking Save");
   const saved = await page.evaluate(async () => {
     const blob = window.__paperpilotOffice.saved;
     const bytes = new Uint8Array(await blob.arrayBuffer());
