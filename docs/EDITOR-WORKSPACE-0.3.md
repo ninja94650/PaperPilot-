@@ -67,6 +67,16 @@ Expose one **Compress document** action for all supported formats, with a format
 - Use immutable revision IDs and per-owner access control for cloud history. A revision download must be scoped to its owner and short-lived.
 - Switching editors or tabs must not reset another document's working state.
 
+### Implementation status (25 November 2026)
+
+- **Implemented on the feature branch:** Office Studio uses the editor's save callback for 2.5-second idle autosave to IndexedDB. The original source Blob is retained separately from immutable local revisions. Dashboard startup restores the latest saved revision after refresh.
+- **Implemented on the feature branch:** cloud history is opt-in. The original is uploaded to the existing private Supabase `documents` bucket; future revisions use unique immutable object paths and owner-scoped metadata rows.
+- **Implemented and applied:** `public.editor_revisions` migration with RLS, read-only authenticated access and a service-role-only atomic publisher. Per-document version allocation is serialized and parent lineage is validated.
+- **Implemented:** private revision downloads are owner-checked and use short-lived signed URLs. Cloud history exposes metadata, not storage paths.
+- **Added tests:** rich DOCX/PPTX fixtures, malformed OOXML package fixtures, browser edit-save-reopen checks, IndexedDB refresh recovery and disposable Postgres RLS/lineage checks. CI results are pending; these tests are not yet a passing release gate.
+- **Security gate still open:** browser-published cloud revisions receive hardened ZIP/OOXML structural validation but are not yet ClamAV-scanned. Do not enable cloud Office autosave broadly or claim malware scanning until revision publication is routed through the existing isolated scanner and a clean result is required before publication/download.
+- **Other release gates:** route-level HTTP authorization/failure tests, manual Chrome/Edge verification, concurrent-tab conflict handling and quota exhaustion testing remain outstanding.
+
 ## Delivery phases and acceptance gates
 
 ### Phase A — routing foundation (first)
