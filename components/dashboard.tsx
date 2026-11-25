@@ -118,9 +118,10 @@ export default function Dashboard() {
     const token = ++routeToken.current;
     const detected = detectDocumentFormat(new Uint8Array(await file.arrayBuffer()), file.name, file.type);
     if (detected.editor === "word" || detected.editor === "presentation") {
+      const officeKind: "word" | "presentation" = detected.editor;
       setOfficeSessions((current) => {
         const next = new Map(current);
-        next.set(file, detected.editor);
+        next.set(file, officeKind);
         return next;
       });
     }
