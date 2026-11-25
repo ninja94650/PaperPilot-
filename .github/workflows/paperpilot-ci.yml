@@ -44,6 +44,8 @@ jobs:
         run: npm run test:security
       - name: HTTP-level API authorization suite
         run: npm run test:http
+      - name: Document format detection and editor routing tests
+        run: npm run test:documents
       - name: Searchable OCR PDF text-layer tests
         run: npm run test:ocr
       - name: Worker input validation tests
