@@ -17,14 +17,38 @@ let browser;
 before(async () => { browser = await chromium.launch({ headless: true }); });
 after(async () => { await browser?.close(); });
 
+function captureBrowserDiagnostics(page) {
+  const diagnostics = [];
+  page.on("pageerror", (error) => diagnostics.push("pageerror: " + error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") diagnostics.push("console: " + message.text());
+  });
+  page.on("requestfailed", (request) => diagnostics.push("requestfailed: " + request.url() + " " + (request.failure()?.errorText || "")));
+  return diagnostics;
+}
+
+async function waitForOffice(page, predicate, label, diagnostics) {
+  try {
+    await page.waitForFunction(predicate, null, { timeout: 15000 });
+  } catch {
+    const state = await page.evaluate(() => ({
+      url: location.href,
+      title: document.title,
+      body: document.body?.innerText?.slice(0, 1500) || "",
+      officeGlobal: typeof window.__paperpilotOffice,
+      draftGlobal: typeof window.__paperpilotDraft
+    }));
+    throw new Error(label + " did not initialize: " + JSON.stringify(state) + "; browser diagnostics: " + diagnostics.join(" | "));
+  }
+}
+
 async function openFixture(file) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+  const errors = captureBrowserDiagnostics(page);
   await page.goto(base + "/?file=/" + file);
-  await page.waitForFunction(() => window.__paperpilotOffice?.events.some((event) => event.type === "load" || event.type === "error"), null, { timeout: 30000 });
+  await waitForOffice(page, () => window.__paperpilotOffice?.events.some((event) => event.type === "load" || event.type === "error"), "Office editor", errors);
   const failure = await page.evaluate(() => window.__paperpilotOffice.events.find((event) => event.type === "error"));
-  if (failure) throw new Error("Office engine load failed: " + failure.message);
+  if (failure) throw new Error("Office engine load failed: " + failure.message + "; browser diagnostics: " + errors.join(" | "));
   return { page, errors };
 }
 
@@ -115,8 +139,9 @@ test("PPTX: edit, save, reopen and preserve master, notes, table and image", asy
 
 test("malformed ZIP directory is rejected by the browser editor", async () => {
   const page = await browser.newPage();
+  const diagnostics = captureBrowserDiagnostics(page);
   await page.goto(base + "/?file=/malformed-eocd.docx");
-  await page.waitForFunction(() => window.__paperpilotOffice?.events.some((event) => event.type === "error"), null, { timeout: 30000 });
+  await waitForOffice(page, () => window.__paperpilotOffice?.events.some((event) => event.type === "error"), "Malformed-file rejection event", diagnostics);
   const error = await page.evaluate(() => window.__paperpilotOffice.events.find((event) => event.type === "error"));
   assert.ok(error?.message, "malformed package must fail with a reported parser error");
   assert.equal(await page.locator(".de-pages").count(), 0, "malformed package must not expose an editable document canvas");
@@ -126,11 +151,12 @@ test("malformed ZIP directory is rejected by the browser editor", async () => {
 
 test("IndexedDB autosave survives refresh and restores immutable source and cloud lineage", async () => {
   const page = await browser.newPage();
+  const diagnostics = captureBrowserDiagnostics(page);
   await page.goto(base + "/");
-  await page.waitForFunction(() => !!window.__paperpilotDraft);
+  await waitForOffice(page, () => !!window.__paperpilotDraft, "IndexedDB draft harness", diagnostics);
   const sessionId = await page.evaluate(() => window.__paperpilotDraft.createAndSave());
   await page.reload();
-  await page.waitForFunction(() => !!window.__paperpilotDraft);
+  await waitForOffice(page, () => !!window.__paperpilotDraft, "IndexedDB draft harness after reload", diagnostics);
   const drafts = await page.evaluate(() => window.__paperpilotDraft.list());
   const recovered = drafts.find((draft) => draft.sessionId === sessionId);
   assert.ok(recovered, "local Office draft must be discoverable after a full page reload");
