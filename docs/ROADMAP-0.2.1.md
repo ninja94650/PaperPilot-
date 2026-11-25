@@ -45,7 +45,7 @@ Implemented in source:
 
 Remaining:
 - Deploy only on a private/self-hosted environment with verified outbound egress restrictions, HTTPS API boundary, host firewall, rate limits and resource enforcement.
-- CI run #154 built the worker Docker image and generated synthetic DOCX/PPTX plus legacy DOC/PPT fixtures; LibreOffice converted all four to non-empty PDF outputs. This is a format-level smoke test through the actual worker image, not yet the full queue/scanner/storage publication path.
+- CI run #175 built the actual worker Docker image, converted DOC/DOCX/PPT/PPTX fixtures to PDFs, and passed a queue-to-storage orchestration test using real LibreOffice and a deterministic local API/storage fixture. The test verified clean input scan, conversion, output scan, private-object PUT, PDF signature/size verification and revision-publication ordering. It does not connect to live Supabase Storage or the production API.
 - Worker Docker image now selects the headless SVP VCL plugin; the conversion test caught and fixed an X11 display dependency.
 - Verify storage cleanup on every failure and cancellation path.
 
@@ -82,12 +82,14 @@ Verified against the linked Supabase project:
 
 Remaining before public use:
 - Added rollback-only SQL regression fixture `supabase/tests/processing_pipeline_rls_and_recovery.sql` covering owner A/B visibility for jobs, events and revisions plus expired processing-lease reclamation. It has been schema-reviewed and corrected to use the event ID sequence, but must run against a disposable Supabase database before release. Do not run it against production.
-- HTTP-level cross-user/IDOR tests for every API route and storage object remain.
-- Callback-forgery and malformed input regression tests.
+- Route-level HTTP request tests now cover job creation, status, cancellation, download, cross-tenant ID hiding, signed-link protection, rate-limit behavior and worker bearer-token rejection. GitHub Actions run #175 passed the complete HTTP authorization suite.
+- Callback-forgery and malformed input regression tests remain.
 - Added 7 output-cleanup classifier tests for current attempt preservation, retry cleanup, terminal jobs, lease grace, foreign paths and future-attempt path rejection. Root security suite now has 11 passing tests.
 - Added opt-in live ClamAV EICAR and clean-PDF integration fixtures in `worker/clamav.integration.test.mjs`; not executed against a live scanner yet.
-- GitHub Actions run #126 passed on feature head `7562c9f0195b45eccfe846d18d26e6293c8b6416`: 24 worker tests passed, 2 opt-in live ClamAV tests skipped, both dependency audits reported zero vulnerabilities, TypeScript typecheck passed and Next.js production build passed.
-- Host-level rate limiting, egress controls, metrics/alerts, log redaction, retention cleanup and backup/restore verification.
+- GitHub Actions run #175 passed all four CI jobs on the feature head, including route-level HTTP authorization, worker conversion queue-to-storage orchestration, live ClamAV and disposable PostgreSQL RLS/rate-limit regression. GitHub Actions run #126 passed on feature head `7562c9f0195b45eccfe846d18d26e6293c8b6416`: 24 worker tests passed, 2 opt-in live ClamAV tests skipped, both dependency audits reported zero vulnerabilities, TypeScript typecheck passed and Next.js production build passed.
+- Added low-cardinality Prometheus metrics for scan/job results, durations, cleanup outcomes, queue poll errors and last-success timestamps. Added /readyz and /metrics endpoints, a private-network Prometheus service with 15-day/1-GiB retention, loopback-only UI binding, and health/metrics tests.
+- Compose now separates an internal worker/ClamAV/Prometheus network from the worker/ClamAV HTTPS egress network. Added a dry-run-first nftables host policy script to restrict worker egress to resolved PaperPilot API/Supabase IPv4 destinations and ClamAV egress to its update host.
+- Production network/monitoring verification remains open: the host firewall script has not been applied to a real worker host; Docker network routing, IPv6, allowed/blocked egress, Prometheus scrape health, alert delivery, log redaction/retention, host resource monitoring, backups/restore and SLOs must be verified on the deployment host.
 - Supabase security/performance advisor recheck and full GitHub CI pass on any subsequent code changes.
 - Vercel deployment API quota has previously been exhausted; do not bypass or pay. Wait for the free quota reset before requesting a preview deployment.
 - Verify Supabase Auth redirects and SMTP.
