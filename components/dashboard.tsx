@@ -314,11 +314,12 @@ export default function Dashboard() {
         files={files}
         onClose={() => { setShowAdvanced(false); setActiveAdvancedTool(null); }}
         onResult={(result) => {
+          const outputs = Array.isArray(result) ? result : [result];
           setShowAdvanced(false);
           setActiveAdvancedTool(null);
-          setFiles((current) => [...current, result]);
-          setActiveIndex(files.length);
-          void routeToFile(result);
+          setFiles((current) => [...current, ...outputs]);
+          setActiveIndex(files.length + outputs.length - 1);
+          void routeToFile(outputs[outputs.length - 1]);
         }}
       />}
 
