@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { DocViewer } from "@p10node/office-engine";
 import "@p10node/office-engine/styles.css";
+import { createOfficeSessionId, ensureOfficeDraftSession, listRecoveredOfficeDrafts, saveOfficeDraftRevision, setOfficeCloudLink } from "../../../lib/editor/local-drafts";
 
 type OfficeEvents = { type: string; [key: string]: unknown };
 declare global {
@@ -12,9 +13,38 @@ declare global {
       savedName: string;
       reopenSaved: () => void;
     };
+    __paperpilotDraft: {
+      createAndSave: () => Promise<string>;
+      list: () => Promise<Array<{ sessionId: string; sourceName: string; latestName: string; latestVersion: number; cloudDocumentId: string | null; parentRevisionId: string | null; latestSize: number }>>;
+    };
   }
 }
 window.__paperpilotOffice = { events: [], saved: null, savedName: "", reopenSaved: () => {} };
+window.__paperpilotDraft = {
+  async createAndSave() {
+    const response = await fetch("/complex.docx");
+    const blob = await response.blob();
+    const source = new File([blob], "draft-source.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const sessionId = await createOfficeSessionId(source, "word");
+    await ensureOfficeDraftSession(sessionId, source, "word");
+    const revision = new File([blob], "draft-revision.docx", { type: source.type });
+    await saveOfficeDraftRevision({ sessionId, sourceFile: source, kind: "word", revisionFile: revision });
+    await setOfficeCloudLink(sessionId, "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222");
+    return sessionId;
+  },
+  async list() {
+    const drafts = await listRecoveredOfficeDrafts();
+    return drafts.map((draft) => ({
+      sessionId: draft.sessionId,
+      sourceName: draft.sourceFile.name,
+      latestName: draft.latestFile.name,
+      latestVersion: draft.latestVersion,
+      cloudDocumentId: draft.cloudDocumentId,
+      parentRevisionId: draft.parentRevisionId,
+      latestSize: draft.latestFile.size
+    }));
+  }
+};
 
 function Harness() {
   const [file, setFile] = useState<File | null>(null);
