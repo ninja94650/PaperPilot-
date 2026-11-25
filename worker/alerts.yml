@@ -1,0 +1,47 @@
+groups:
+  - name: paperpilot-worker
+    rules:
+      - alert: PaperPilotWorkerScrapeDown
+        expr: up{job="paperpilot-worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: PaperPilot worker metrics endpoint is unreachable
+          description: Prometheus has been unable to scrape the worker for at least two minutes.
+
+      - alert: PaperPilotQueuePollingStale
+        expr: time() - paperpilot_worker_queue_poll_last_success_timestamp_seconds > 180
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: PaperPilot worker queue polling is stale
+          description: The worker has not completed a successful queue poll for more than three minutes.
+
+      - alert: PaperPilotJobFailures
+        expr: increase(paperpilot_worker_jobs_total{result="failed"}[15m]) >= 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Repeated PaperPilot conversion failures
+          description: At least three worker attempts failed in the last fifteen minutes.
+
+      - alert: PaperPilotScannerFailures
+        expr: increase(paperpilot_worker_scans_total{result="failed"}[10m]) >= 2
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: PaperPilot malware scanner is failing
+          description: At least two scanner attempts failed in the last ten minutes.
+
+      - alert: PaperPilotOutputCleanupErrors
+        expr: increase(paperpilot_worker_output_cleanup_total{result="error"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: PaperPilot output cleanup encountered errors
+          description: One or more private output cleanup operations failed in the last ten minutes.
