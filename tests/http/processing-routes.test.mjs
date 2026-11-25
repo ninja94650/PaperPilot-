@@ -14,6 +14,7 @@ const state = {
   insertedJob: { id: "job-new", status: "queued", progress_percent: 0, created_at: "2026-01-01T00:00:00Z" },
   cancelledJob: { id: "job-a", status: "cancelled", cancel_requested_at: "2026-01-01T00:00:00Z", progress_message: "Cancelled" },
   signed: { signedUrl: "https://private.example/signed" },
+  signedCalls: 0,
   signedError: null,
   adminConfigured: true,
   adminWrites: []
@@ -44,7 +45,7 @@ const client = {
   storage: {
     from() {
       return {
-        createSignedUrl: async () => ({ data: state.signed, error: state.signedError })
+        createSignedUrl: async () => { state.signedCalls += 1; return { data: state.signed, error: state.signedError }; }
       };
     }
   }
@@ -137,6 +138,7 @@ function reset() {
   state.existing = null;
   state.signed = { signedUrl: "https://private.example/signed" };
   state.signedError = null;
+  state.signedCalls = 0;
   state.adminConfigured = true;
   delete process.env.DOCUMENT_WORKER_TOKEN;
 }
@@ -219,7 +221,7 @@ test("cancellation hides cross-tenant IDs and conditionally updates an owned que
 test("download never signs a cross-tenant output and returns a short-lived private URL for the owner", async () => {
   let response = await downloadRoute.GET(request("/api/processing/jobs/job-b/download"), context("job-b"));
   assert.equal(response.status, 404);
-  assert.equal(state.signed, null);
+  assert.equal(state.signedCalls, 0);
 
   state.owned["processing_jobs:job-a:id"] = { id: "job-a", status: "succeeded", document_id: "doc-a" };
   state.owned["document_revisions:job-a:processing_job_id"] = { storage_path: "user-a/job-a/attempt-1/result.pdf", mime_type: "application/pdf", version: 1 };
