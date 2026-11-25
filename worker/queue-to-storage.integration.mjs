@@ -122,7 +122,7 @@ const clamav = createTcpServer(socket => {
   let stream = false;
   socket.on("data", chunk => {
     command = Buffer.concat([command, chunk]);
-    if (!stream && command.subarray(0, 9).toString("ascii") === "zVERSION") {
+    if (!stream && command.subarray(0, 8).toString("ascii") === "zVERSION") {
       socket.end(Buffer.from("ClamAV 1.4.0 integration-fixture\0"));
     } else if (command.subarray(0, 10).toString("ascii") === "zINSTREAM\0") {
       stream = true;
@@ -171,10 +171,12 @@ try {
     } catch { await new Promise(resolveWait => setTimeout(resolveWait, 250)); }
   }
   assert.ok(health, "worker health endpoint did not become ready");
+  let timeoutHandle;
   const result = await Promise.race([
     completion,
-    new Promise((_, reject) => setTimeout(() => reject(new Error("queue-to-storage integration timed out")), 120_000))
+    new Promise((_, reject) => { timeoutHandle = setTimeout(() => reject(new Error("queue-to-storage integration timed out")), 120_000); })
   ]);
+  clearTimeout(timeoutHandle);
   assert.equal(result.body.jobId, jobId);
   assert.ok(result.outputBytes > 500, "converted PDF should contain a real document");
   assert.deepEqual(events.filter(event => ["scan-result", "claim", "output-upload", "storage:put", "complete", "revision:published"].includes(event)), [
