@@ -251,10 +251,10 @@ jobs:
           cat "$RUNNER_TEMP/paperpilot-office-vite.log"
           exit 1
       - name: Run real DOCX/PPTX edit-save-reopen browser tests
-        env:
-          OFFICE_E2E_TOOLS: "${{ runner.temp }}/office-tools"
-          OFFICE_E2E_URL: "http://127.0.0.1:4173"
-        run: node --test tests/office/e2e.test.mjs
+        run: |
+          export OFFICE_E2E_TOOLS="$RUNNER_TEMP/office-tools"
+          export OFFICE_E2E_URL="http://127.0.0.1:4173"
+          node --test tests/office/e2e.test.mjs
       - name: Stop isolated Office editor fixture server
         if: always()
         run: |
