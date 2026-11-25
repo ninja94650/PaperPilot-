@@ -72,6 +72,8 @@ export default function OfficeStudio({
   const [message, setMessage] = useState("Autosave is local to this browser. Enable cloud history for private account-backed revisions.");
   const saving = useRef(false);
   const original = sourceFile ?? file;
+  const onSessionReadyRef = useRef(onSessionReady);
+  onSessionReadyRef.current = onSessionReady;
 
   useEffect(() => {
     let cancelled = false;
@@ -84,14 +86,14 @@ export default function OfficeStudio({
         setRevision(existing?.latestVersion ?? 0);
         if (existing?.cloudDocumentId) setCloudDocumentId(existing.cloudDocumentId);
         if (existing?.parentRevisionId) setParentRevisionId(existing.parentRevisionId);
-        onSessionReady?.(id, original, kind);
+        onSessionReadyRef.current?.(id, original, kind);
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : "Local autosave is unavailable.");
       }
     }
     void prepare();
     return () => { cancelled = true; };
-  }, [file, original, kind, sessionIdProp, onSessionReady]);
+  }, [file, original, kind, sessionIdProp]);
 
   useEffect(() => {
     if (!viewerState.dirty || !sessionId || saving.current) return;
