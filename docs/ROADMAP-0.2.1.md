@@ -62,7 +62,7 @@ Implemented in source:
 Remaining:
 - CI run #138 passed Linux process-group cancellation integration: cancelling the detached worker also terminated a spawned descendant. The test is Linux-only; Windows process-tree termination remains a separate platform consideration.
 - Live ClamAV EICAR detection and clean-PDF scan passed in CI run #138; all 26 worker tests passed with zero skips.
-- Disposable PostgreSQL CI fixture passed expired processing-lease recovery. Worker crash, retry delay, duplicate delivery and concurrent publication still need dedicated end-to-end tests.
+- Disposable PostgreSQL CI fixture passed expired processing-lease recovery. Worker crash, retry delay, duplicate delivery, Storage deletion failure injection and concurrent publication still need dedicated end-to-end tests. The new local queue-to-storage harness covers the successful path only.
 - Add SSE/realtime only if polling becomes insufficient; status GET remains the reconnect/recovery source of truth.
 
 ## Phase 5 — Security, observability and release gates
@@ -81,13 +81,13 @@ Verified against the linked Supabase project:
 - Live schema inspection confirmed processing event IDs use the expected sequence and the queue-claim RPC signature matches the regression fixture.
 
 Remaining before public use:
-- Added rollback-only SQL regression fixture `supabase/tests/processing_pipeline_rls_and_recovery.sql` covering owner A/B visibility for jobs, events and revisions plus expired processing-lease reclamation. It has been schema-reviewed and corrected to use the event ID sequence, but must run against a disposable Supabase database before release. Do not run it against production.
+- Rollback-only SQL regression fixture `supabase/tests/processing_pipeline_rls_and_recovery.sql` passed in CI against an ephemeral PostgreSQL 17 service with a Supabase-compatible bootstrap schema. It covers owner A/B visibility for jobs, events, revisions and private storage, expired processing-lease reclamation and rate limits. This is not a live Supabase local-stack test; do not run the rollback-only fixture against production.
 - Route-level HTTP request tests now cover job creation, status, cancellation, download, cross-tenant ID hiding, signed-link protection, rate-limit behavior and worker bearer-token rejection. GitHub Actions run #175 passed the complete HTTP authorization suite.
 - Callback-forgery and malformed input regression tests remain.
 - Added 7 output-cleanup classifier tests for current attempt preservation, retry cleanup, terminal jobs, lease grace, foreign paths and future-attempt path rejection. Root security suite now has 11 passing tests.
-- Added opt-in live ClamAV EICAR and clean-PDF integration fixtures in `worker/clamav.integration.test.mjs`; not executed against a live scanner yet.
+- Opt-in live ClamAV EICAR and clean-PDF integration fixtures in `worker/clamav.integration.test.mjs` passed in CI run #175 against the official ClamAV container.
 - GitHub Actions run #175 passed all four CI jobs on the feature head, including route-level HTTP authorization, worker conversion queue-to-storage orchestration, live ClamAV and disposable PostgreSQL RLS/rate-limit regression. GitHub Actions run #126 passed on feature head `7562c9f0195b45eccfe846d18d26e6293c8b6416`: 24 worker tests passed, 2 opt-in live ClamAV tests skipped, both dependency audits reported zero vulnerabilities, TypeScript typecheck passed and Next.js production build passed.
-- Added low-cardinality Prometheus metrics for scan/job results, durations, cleanup outcomes, queue poll errors and last-success timestamps. Added /readyz and /metrics endpoints, a private-network Prometheus service with 15-day/1-GiB retention, loopback-only UI binding, and health/metrics tests.
+- Added low-cardinality Prometheus metrics for scan/job results, durations, cleanup outcomes, queue poll errors and last-success timestamps. Added /readyz and /metrics endpoints, a private-network Prometheus service with 15-day/1-GiB retention, loopback-only UI binding, and health/metrics tests. CI verifies the application metrics and static Compose controls; it does not prove a deployed Prometheus scrape or alert delivery.
 - Compose now separates an internal worker/ClamAV/Prometheus network from the worker/ClamAV HTTPS egress network. Added a dry-run-first nftables host policy script to restrict worker egress to resolved PaperPilot API/Supabase IPv4 destinations and ClamAV egress to its update host.
 - Production network/monitoring verification remains open: the host firewall script has not been applied to a real worker host; Docker network routing, IPv6, allowed/blocked egress, Prometheus scrape health, alert delivery, log redaction/retention, host resource monitoring, backups/restore and SLOs must be verified on the deployment host.
 - Supabase security/performance advisor recheck and full GitHub CI pass on any subsequent code changes.
