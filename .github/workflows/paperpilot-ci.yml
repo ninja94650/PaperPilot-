@@ -229,7 +229,7 @@ jobs:
             --entrypoint node paperpilot-worker-ci /app/queue-to-storage.integration.mjs
 
   office-browser-roundtrip:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - name: Checkout
