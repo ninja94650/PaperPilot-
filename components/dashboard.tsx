@@ -12,6 +12,7 @@ import { addTextToPdf, extractPages, mergePdfs, rotatePages, splitPdf } from "@/
 import PdfPageWorkspace from "@/components/pdf-page-workspace";
 import AdvancedToolDialog from "@/components/advanced-tool-dialog";
 import CloudSaveButton from "@/components/cloud-save-button";
+import { detectDocumentFormat, editorLabel, type EditorKind } from "@/lib/document-format.mjs";
 
 type ToolId = "merge" | "split" | "rotate" | "extract" | "annotate" | "sign" | "compress" | "convert" | "ocr";
 type Tool = { id: ToolId; title: string; description: string; icon: typeof FileText; tint: string; ready: boolean; label?: string };
@@ -70,6 +71,8 @@ export default function Dashboard() {
   const [signature, setSignature] = useState("");
   const [showTextPanel, setShowTextPanel] = useState<"annotate" | "sign" | null>(null);
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
+  const [activeEditorKind, setActiveEditorKind] = useState<EditorKind>("pdf");
+  const [formatWarning, setFormatWarning] = useState("");
 
   const activeFile = files[activeIndex] ?? null;
   const pdfFiles = files.filter(isPdf);
@@ -101,6 +104,12 @@ export default function Dashboard() {
     event.preventDefault();
     setDragging(false);
     importFiles(event.dataTransfer.files);
+  }
+  async function routeToFile(file: File) {
+    const detected = detectDocumentFormat(new Uint8Array(await file.arrayBuffer()), file.name, file.type);
+    setActiveEditorKind(detected.editor);
+    setFormatWarning(detected.warning || "");
+    return detected;
   }
   function openEditor(tool: ToolId | null = null) {
     if (!files.length) {
@@ -301,9 +310,9 @@ export default function Dashboard() {
       {notice && <div className="toast" role="status"><span><Check size={15} /></span>{notice}<button aria-label="Dismiss message" onClick={() => setNotice("")}><X size={15} /></button></div>}
 
       {editing && <div className="editor-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closeEditor(); }}>
-        <section className="editor-modal" role="dialog" aria-modal="true" aria-label="PaperPilot PDF editor">
+        <section className="editor-modal" role="dialog" aria-modal="true" aria-label={"PaperPilot " + editorLabel(activeEditorKind)}>
           <header className="editor-header">
-            <div className="editor-brand"><span className="brand-mark"><FileStack size={18} /></span><b>PaperPilot <span>/ PDF workspace</span></b></div>
+            <div className="editor-brand"><span className="brand-mark"><FileStack size={18} /></span><b>PaperPilot <span>/ {editorLabel(activeEditorKind)}</span></b></div>
             <div className="editor-header-actions">
               <label className="import-button" htmlFor="editor-file-picker"><Plus size={15} /> Import files</label>
               <input className="sr-only" id="editor-file-picker" type="file" accept={accepted} multiple onChange={onInput} />
@@ -314,7 +323,7 @@ export default function Dashboard() {
           <div className="editor-body">
             <aside className="editor-sidebar">
               <div className="sidebar-title"><span>WORKSPACE FILES</span><span>{files.length}</span></div>
-              <div className="editor-file-list">{files.map((file, index) => <button className={"editor-file " + (index === activeIndex ? "editor-file-active" : "")} key={file.name + file.lastModified + index} onClick={() => { setActiveIndex(index); setShowTextPanel(null); }}>
+              <div className="editor-file-list">{files.map((file, index) => <button className={"editor-file " + (index === activeIndex ? "editor-file-active" : "")} key={file.name + file.lastModified + index} onClick={() => { setActiveIndex(index); setShowTextPanel(null); void routeToFile(file); }}>
                 <span className={"file-type-icon " + (isPdf(file) ? "pdf-icon" : "other-icon")}>{isPdf(file) ? <FileText size={17} /> : <FileImage size={17} />}</span>
                 <span><b>{file.name}</b><small>{formatBytes(file.size)}</small></span>
                 {index === activeIndex && <span className="active-dot" />}
@@ -339,7 +348,7 @@ export default function Dashboard() {
               </div>}
               <div className="preview-stage">
                 {busy && <div className="processing-shade"><LoaderCircle className="spin" size={26} /><b>Updating your document</b><small>Processing locally in your browser</small></div>}
-                {activeFile && isPdf(activeFile) ? <PdfPageWorkspace file={activeFile} onChange={updateActiveFile} /> : <div className="empty-preview">
+                {activeFile && activeEditorKind === "pdf" && isPdf(activeFile) ? <PdfPageWorkspace file={activeFile} onChange={updateActiveFile} /> : <div className="empty-preview">
                   <div className="empty-preview-icon">{activeFile ? <ImageIcon size={28} /> : <FileStack size={28} />}</div>
                   <h3>{activeFile ? "Choose a PDF or convert this file" : "Your canvas is ready"}</h3>
                   <p>{activeFile ? "Images can be converted locally. DOCX and PPTX conversion requires the secure LibreOffice worker connection." : "Import a PDF to preview and edit it here."}</p>
@@ -347,7 +356,7 @@ export default function Dashboard() {
                 </div>}
               </div>
               <div className="editor-bottom-bar">
-                <span><span className="status-dot" /> {activeFile ? (isPdf(activeFile) ? "PDF ready" : "Preview unavailable") : "Waiting for a file"}</span>
+                <span><span className="status-dot" /> {activeFile ? editorLabel(activeEditorKind) + (activeEditorKind === "pdf" ? " ready" : " selected") : "Waiting for a file"}</span>
                 <div className="bottom-actions">
                   <>{activeTool === "split" && <button onClick={() => runPdfAction("split")} disabled={busy || !activeFile || !isPdf(activeFile)}><Scissors size={14} /> Split into pages</button>}<button onClick={() => runPdfAction("merge")} disabled={busy || pdfFiles.length < 2}><Combine size={14} /> Merge {pdfFiles.length > 0 ? "PDFs (" + pdfFiles.length + ")" : "PDFs"}</button></>
                   <div className="range-control"><span>Pages</span><input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="Page range to extract" placeholder="1, 3-5" /><button onClick={() => runPdfAction("extract")} disabled={busy || !activeFile || !isPdf(activeFile)}>Extract</button></div>
