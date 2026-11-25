@@ -115,7 +115,9 @@ const internalRoutes = await Promise.all([
   import("../../app/api/internal/processing/scan-result/route.ts"),
   import("../../app/api/internal/processing/output-upload/route.ts"),
   import("../../app/api/internal/processing/complete/route.ts"),
-  import("../../app/api/internal/processing/cleanup-outputs/route.ts"),\n  import("../../app/api/internal/editor-revisions/claim-scan/route.ts"),\n  import("../../app/api/internal/editor-revisions/scan-result/route.ts")
+  import("../../app/api/internal/processing/cleanup-outputs/route.ts"),
+  import("../../app/api/internal/editor-revisions/claim-scan/route.ts"),
+  import("../../app/api/internal/editor-revisions/scan-result/route.ts")
 ]);
 
 function request(url, method = "GET", body) {
