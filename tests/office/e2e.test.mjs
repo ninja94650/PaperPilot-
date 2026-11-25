@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(join(process.env.OFFICE_E2E_TOOLS || "", "resolve.cjs"));
 const { chromium } = require("playwright-core");
+const python = process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
 const base = process.env.OFFICE_E2E_URL || "http://127.0.0.1:4173";
 const here = dirname(fileURLToPath(import.meta.url));
 let browser;
@@ -69,7 +70,7 @@ async function inspect(bytes, name, kind) {
   try {
     const file = join(dir, name);
     await writeFile(file, Buffer.from(bytes, "base64"));
-    execFileSync("python3", [join(here, "inspect-roundtrip.py"), file, kind], { stdio: "pipe" });
+    execFileSync(python, [join(here, "inspect-roundtrip.py"), file, kind], { stdio: "pipe" });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
