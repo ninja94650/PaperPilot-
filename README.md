@@ -51,3 +51,8 @@ See:
 - docs/INTEGRATIONS-0.2.md
 - worker/README.md
 - docs/ROADMAP-0.2.md
+
+
+## OCR
+
+Browser OCR uses PDF.js and a Tesseract.js worker. It exports a full transcript for supported OCR languages and a searchable PDF text layer for English, German, French and Spanish. Hindi is transcript-only until a Unicode font is bundled. OCR does not upload the source document to the server.

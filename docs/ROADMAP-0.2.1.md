@@ -105,3 +105,11 @@ Only Office-to-PDF is enabled in the queue submission API. PDF/image/OCR browser
 - Supabase Postgres is the durable queue source of truth.
 - The Compose worker is a self-hosted reference. Do not deploy it on a billable host or exceed any existing free-tier allowance.
 - Do not merge PR #3 or promote a preview to production without explicit user approval.
+
+
+## Browser OCR follow-up
+
+- OCR continues to run locally in the browser using PDF.js rendering and a Tesseract.js worker; source documents are not uploaded for OCR.
+- English, German, French and Spanish now produce both a plain-text transcript and a searchable PDF with an invisible, position-mapped text layer. The source PDF remains unchanged.
+- Hindi OCR remains available as a full transcript. A searchable Hindi PDF is intentionally not claimed until a licensed Unicode font is bundled and embedded; the current Standard-14 PDF font cannot encode Devanagari.
+- A Node/PDF.js regression test verifies that the generated invisible text layer remains extractable while the original page geometry is preserved.

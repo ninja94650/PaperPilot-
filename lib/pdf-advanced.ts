@@ -1,4 +1,5 @@
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+import { addInvisibleOcrTextLayer } from "./ocr-text-layer.mjs";
 import { createWorker } from "tesseract.js";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
 
@@ -69,12 +70,39 @@ export async function compressPdfRasterized(
   return new File([buffer], file.name.replace(/\.pdf$/i, "") + "-compressed.pdf", { type: "application/pdf" });
 }
 
-export async function ocrPdf(file: File, language: string, onProgress?: (completed: number, total: number) => void): Promise<string> {
+export type OcrResult = {
+  transcript: File;
+  searchablePdf: File | null;
+  pages: number;
+  wordsRecognized: number;
+};
+
+const searchableTextLanguages = new Set(["eng", "deu", "fra", "spa"]);
+
+export async function ocrPdf(
+  file: File,
+  language: string,
+  onProgress?: (completed: number, total: number) => void
+): Promise<OcrResult> {
   const source = await loadPdfForWorkspace(file);
-  if (source.numPages > 100) throw new Error("OCR is limited to 100 pages per file in the browser.");
-  const worker = await createWorker(language);
-  const output: string[] = [];
+  if (source.numPages > 100) {
+    await source.destroy();
+    throw new Error("OCR is limited to 100 pages per file in the browser.");
+  }
+
+  const canEmbedSearchableText = searchableTextLanguages.has(language);
+  const searchableDocument = canEmbedSearchableText
+    ? await PDFDocument.load(await file.arrayBuffer())
+    : null;
+  const font = searchableDocument
+    ? await searchableDocument.embedFont(StandardFonts.Helvetica)
+    : null;
+  const transcriptPages: string[] = [];
+  let wordsRecognized = 0;
+  let worker: Awaited<ReturnType<typeof createWorker>> | undefined;
+
   try {
+    worker = await createWorker(language);
     for (let pageNumber = 1; pageNumber <= source.numPages; pageNumber += 1) {
       const page = await source.getPage(pageNumber);
       const baseViewport = page.getViewport({ scale: 1 });
@@ -85,17 +113,61 @@ export async function ocrPdf(file: File, language: string, onProgress?: (complet
       canvas.height = Math.ceil(viewport.height);
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Your browser could not create an OCR canvas.");
-      await page.render({ canvasContext: context, viewport, canvas }).promise;
-      const result = await worker.recognize(canvas);
-      output.push("===== Page " + pageNumber + " =====\n" + result.data.text.trim());
-      canvas.width = 0;
-      canvas.height = 0;
+
+      try {
+        await page.render({ canvasContext: context, viewport, canvas }).promise;
+        const result = await worker.recognize(canvas);
+        transcriptPages.push("===== Page " + pageNumber + " =====\n" + result.data.text.trim());
+
+        if (searchableDocument && font) {
+          const positionedWords = (result.data.words ?? [])
+            .filter((word) => word.confidence >= 20 && word.text.trim())
+            .map((word) => {
+              const [left, bottom] = viewport.convertToPdfPoint(word.bbox.x0, word.bbox.y1);
+              const [right, top] = viewport.convertToPdfPoint(word.bbox.x1, word.bbox.y0);
+              return {
+                text: word.text,
+                x: Math.min(left, right),
+                y: Math.min(bottom, top),
+                width: Math.abs(right - left),
+                height: Math.abs(top - bottom)
+              };
+            });
+          wordsRecognized += addInvisibleOcrTextLayer(
+            searchableDocument.getPage(pageNumber - 1),
+            font,
+            positionedWords
+          );
+        }
+      } finally {
+        canvas.width = 0;
+        canvas.height = 0;
+        page.cleanup();
+      }
+
       onProgress?.(pageNumber, source.numPages);
     }
   } finally {
-    await worker.terminate();
+    if (worker) await worker.terminate();
+    await source.destroy();
   }
-  return output.join("\n\n");
+
+  const transcriptText = transcriptPages.join("\n\n").trim();
+  if (!transcriptText) throw new Error("OCR did not recognize any text in this PDF.");
+  const stem = file.name.replace(/\.pdf$/i, "") || "document";
+  const transcript = new File([transcriptText], stem + "-ocr.txt", {
+    type: "text/plain;charset=utf-8"
+  });
+
+  let searchablePdf: File | null = null;
+  if (searchableDocument && wordsRecognized > 0) {
+    const bytes = await searchableDocument.save({ useObjectStreams: true });
+    const buffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(buffer).set(bytes);
+    searchablePdf = new File([buffer], stem + "-searchable.pdf", { type: "application/pdf" });
+  }
+
+  return { transcript, searchablePdf, pages: source.numPages, wordsRecognized };
 }
 
 export async function imageFilesToPdf(files: File[]): Promise<File> {

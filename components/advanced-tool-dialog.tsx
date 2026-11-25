@@ -55,10 +55,15 @@ export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
         setMessage(saved > 0 ? "Saved " + Math.round((saved / file.size) * 100) + "% (" + (saved / 1024).toFixed(0) + " KB)." : "The compressed PDF is " + Math.abs(Math.round((saved / 1024))) + " KB larger. You can still download it.");
         onResult(compressed);
       } else if (action === "ocr") {
-        const text = await ocrPdf(file, language, (done, total) => setProgress("Recognizing page " + done + " of " + total));
-        const result = new File([text], file.name.replace(/\.pdf$/i, "") + "-ocr.txt", { type: "text/plain;charset=utf-8" });
-        download(result);
-        setMessage("OCR transcript exported as a text file.");
+        const result = await ocrPdf(file, language, (done, total) => setProgress("Recognizing page " + done + " of " + total));
+        download(result.transcript);
+        if (result.searchablePdf) {
+          download(result.searchablePdf);
+          onResult(result.searchablePdf);
+          setMessage("OCR recognized " + result.wordsRecognized + " words across " + result.pages + " pages. Searchable PDF and transcript exported.");
+        } else {
+          setMessage("OCR transcript exported. Searchable PDF text layers currently support English, German, French and Spanish; this language remains available as a full transcript.");
+        }
       } else if (action === "images-pdf") {
         const result = await imageFilesToPdf(images);
         download(result);
@@ -152,7 +157,7 @@ export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
       <div className="pp-tool-content">
         <div className="pp-tool-file">{file ? <><b>{file.name}</b><span>{(file.size / 1024 / 1024).toFixed(2)} MB</span></> : <p>Import a supported file to begin.</p>}</div>
         {tool === "compress" && <div className="pp-tool-option"><label htmlFor="pp-quality">Image quality</label><select id="pp-quality" value={quality} onChange={(event) => setQuality(event.target.value)}><option value="0.9">High quality — larger file</option><option value="0.72">Balanced — recommended</option><option value="0.48">Smallest — lower quality</option></select><small>This compression rebuilds pages as images. Searchable text, links, forms and vector content will be flattened.</small></div>}
-        {tool === "ocr" && <div className="pp-tool-option"><label htmlFor="pp-language">Recognition language</label><select id="pp-language" value={language} onChange={(event) => setLanguage(event.target.value)}><option value="eng">English</option><option value="hin">Hindi</option><option value="deu">German</option><option value="fra">French</option><option value="spa">Spanish</option></select><small>Exports recognized text as a .txt transcript. The original PDF is not modified.</small></div>}
+        {tool === "ocr" && <div className="pp-tool-option"><label htmlFor="pp-language">Recognition language</label><select id="pp-language" value={language} onChange={(event) => setLanguage(event.target.value)}><option value="eng">English</option><option value="hin">Hindi</option><option value="deu">German</option><option value="fra">French</option><option value="spa">Spanish</option></select><small>Exports a full text transcript and, for English/German/French/Spanish, a searchable PDF with an invisible text layer. The original is never overwritten.</small></div>}
         {tool === "convert" && <div className="pp-tool-convert-list">
           {images.length > 0 && <button disabled={busy} onClick={() => run("images-pdf")}>Images to PDF <ArrowDownToLine size={15} /></button>}
           {pdfs.length > 0 && <button disabled={busy} onClick={() => run("pdf-images")}>PDF pages to PNG images <ArrowDownToLine size={15} /></button>}
@@ -164,7 +169,7 @@ export default function AdvancedToolDialog({ tool, files, onClose, onResult }: {
       </div>
       <footer>
         {tool === "compress" && <button className="pp-tool-primary" disabled={!pdfs.length || busy} onClick={() => run("compress")}>{busy ? "Compressing…" : "Compress and download"}</button>}
-        {tool === "ocr" && <button className="pp-tool-primary" disabled={!pdfs.length || busy} onClick={() => run("ocr")}>{busy ? "Recognizing…" : "Extract text"}</button>}
+        {tool === "ocr" && <button className="pp-tool-primary" disabled={!pdfs.length || busy} onClick={() => run("ocr")}>{busy ? "Recognizing…" : "Create searchable PDF"}</button>}
         {tool === "convert" && <button className="pp-tool-secondary" onClick={onClose} disabled={busy}>Close</button>}
       </footer>
     </section>
