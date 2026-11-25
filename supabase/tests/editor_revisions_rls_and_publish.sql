@@ -61,6 +61,33 @@ select * from public.publish_editor_revision(
   'word',1100,repeat('b',64)
 );
 
+insert into public.editor_revision_scan_jobs(
+  id,owner_id,document_id,revision_id,parent_revision_id,storage_path,name,mime_type,editor_kind,size_bytes,sha256
+) values (
+  '99999999-9999-4999-8999-999999999999',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  '99999999-9999-4999-8999-999999999999',
+  'ffffffff-ffff-4fff-8fff-ffffffffffff',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/cccccccc-cccc-4ccc-8ccc-cccccccccccc/editor/99999999-9999-4999-8999-999999999999/revision-3.docx',
+  'revision-3.docx',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'word',1200,repeat('c',64)
+);
+do $
+declare v_count integer;
+begin
+  select count(*) into v_count from public.claim_editor_revision_scan_job('office-ci-worker',120);
+  if v_count <> 1 then raise exception 'Office scan queue did not atomically claim one queued revision'; end if;
+  if not exists (
+    select 1 from public.editor_revision_scan_jobs
+    where id='99999999-9999-4999-8999-999999999999'
+      and status='scanning' and worker_id='office-ci-worker' and attempt_count=1
+      and lease_expires_at > now()
+  ) then raise exception 'Office scan lease metadata was not persisted'; end if;
+end
+$;
+
 reset role;
 set role authenticated;
 
