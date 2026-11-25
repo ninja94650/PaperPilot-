@@ -48,10 +48,10 @@ window.__paperpilotDraft = {
 };
 
 function Harness() {
-  const controller = useMemo(() => createViewerController(), []);
+  const [generation, setGeneration] = useState(0);
+  const controller = useMemo(() => createViewerController(), [generation]);
   const viewerState = useViewerState(controller);
   const [file, setFile] = useState<File | null>(null);
-  const [generation, setGeneration] = useState(0);
   const [loadError, setLoadError] = useState("");
   const requested = new URLSearchParams(location.search).get("file") || "/complex.docx";
 
