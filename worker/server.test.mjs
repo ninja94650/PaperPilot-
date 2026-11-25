@@ -163,3 +163,38 @@ test("retired synchronous conversion endpoint cannot bypass the scan queue", asy
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("metrics endpoint exposes only the Prometheus text format", async () => {
+  const server = app.listen(0, "127.0.0.1");
+  try {
+    await new Promise((resolve) => server.once("listening", resolve));
+    const address = server.address();
+    const response = await fetch("http://127.0.0.1:" + address.port + "/metrics");
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /text\/plain/);
+    assert.match(await response.text(), /paperpilot_worker_jobs_total/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("readiness fails closed when worker API or token configuration is missing", async () => {
+  const previousApi = process.env.PAPERPILOT_API_URL;
+  const previousToken = process.env.DOCUMENT_WORKER_TOKEN;
+  delete process.env.PAPERPILOT_API_URL;
+  delete process.env.DOCUMENT_WORKER_TOKEN;
+  const server = app.listen(0, "127.0.0.1");
+  try {
+    await new Promise((resolve) => server.once("listening", resolve));
+    const address = server.address();
+    const response = await fetch("http://127.0.0.1:" + address.port + "/readyz");
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).reason, "worker_configuration_missing");
+  } finally {
+    if (previousApi === undefined) delete process.env.PAPERPILOT_API_URL;
+    else process.env.PAPERPILOT_API_URL = previousApi;
+    if (previousToken === undefined) delete process.env.DOCUMENT_WORKER_TOKEN;
+    else process.env.DOCUMENT_WORKER_TOKEN = previousToken;
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
