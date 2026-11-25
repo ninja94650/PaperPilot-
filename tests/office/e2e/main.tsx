@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createViewerController, useViewerState } from "@p10node/office-engine";
 import { createRoot } from "react-dom/client";
 import { DocViewer } from "@p10node/office-engine";
 import "@p10node/office-engine/styles.css";
@@ -47,6 +48,8 @@ window.__paperpilotDraft = {
 };
 
 function Harness() {
+  const controller = useMemo(() => createViewerController(), []);
+  const viewerState = useViewerState(controller);
   const [file, setFile] = useState<File | null>(null);
   const [generation, setGeneration] = useState(0);
   const [loadError, setLoadError] = useState("");
@@ -70,12 +73,21 @@ function Harness() {
     setGeneration((value) => value + 1);
   };
 
+  useEffect(() => {
+    if (!viewerState.dirty) return;
+    const timer = window.setTimeout(() => {
+      void controller.save();
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [viewerState.dirty, viewerState.rev, controller]);
+
   if (loadError) return <pre role="alert">{loadError}</pre>;
   if (!file) return <div role="status">Loading fixture…</div>;
 
   return <div style={{ height: "100vh", width: "100vw" }}>
     <DocViewer
       key={generation}
+      controller={controller}
       src={file}
       name={file.name}
       editable
