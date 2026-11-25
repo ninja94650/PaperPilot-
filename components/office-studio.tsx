@@ -112,7 +112,7 @@ export default function OfficeStudio({
   useEffect(() => {
     if (!viewerState.dirty || !sessionId || saving.current) return;
     const timer = window.setTimeout(() => {
-      if (!saving.current) controller.save();
+      if (!saving.current) void controller.save().catch((error) => setMessage(error instanceof Error ? error.message : "Automatic Office save failed."));
     }, 2500);
     return () => window.clearTimeout(timer);
   }, [viewerState.dirty, viewerState.rev, controller, sessionId, saveEpoch]);
