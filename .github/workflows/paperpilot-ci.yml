@@ -139,6 +139,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Validate hardened worker Compose configuration
+        env:
+          DOCUMENT_WORKER_TOKEN: "ci-only-not-a-secret-token-long-enough-for-compose"
+          PAPERPILOT_API_URL: "https://paperpilot.invalid"
+        run: docker compose -f worker/compose.yaml config --quiet
       - name: Build the isolated LibreOffice worker image
         run: docker build --tag paperpilot-worker-ci ./worker
       - name: Set up Python
