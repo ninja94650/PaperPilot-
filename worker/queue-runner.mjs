@@ -283,7 +283,10 @@ export function startQueueRunner() {
     try {
       await sweepOrphanedOutputs();
       const scanned = await scanOne();
-      if (!scanned) await processOne();
+      if (!scanned) {
+        const editorScanned = await scanOneEditorRevision();
+        if (!editorScanned) await processOne();
+      }
       recordQueuePollSuccess();
     } catch (error) {
       recordQueuePollError();
