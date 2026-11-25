@@ -3,6 +3,8 @@ import { extname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
 import { startQueueRunner } from "./queue-runner.mjs";
+import { getClamAvVersion } from "./clamav.mjs";
+import { renderMetrics } from "./metrics.mjs";
 
 export const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -27,6 +29,25 @@ export function validateFile(file) {
 }
 
 app.get("/healthz", (_req, res) => res.json({ ok: true, service: "paperpilot-converter" }));
+
+app.get("/readyz", async (_req, res) => {
+  const apiConfigured = Boolean(process.env.PAPERPILOT_API_URL);
+  const tokenConfigured = Boolean(process.env.DOCUMENT_WORKER_TOKEN && process.env.DOCUMENT_WORKER_TOKEN.length >= 32);
+  if (!apiConfigured || !tokenConfigured) {
+    return res.status(503).json({ ok: false, reason: "worker_configuration_missing" });
+  }
+  try {
+    await getClamAvVersion({ timeoutMs: 5_000 });
+    return res.json({ ok: true, service: "paperpilot-converter", scanner: "ready" });
+  } catch {
+    return res.status(503).json({ ok: false, reason: "scanner_unavailable" });
+  }
+});
+
+// Scraped only by Prometheus on the private Compose network; this route is not host-published.
+app.get("/metrics", (_req, res) => {
+  res.set("Content-Type", "text/plain; version=0.0.4; charset=utf-8").send(renderMetrics());
+});
 
 app.post("/convert", (_req, res) => {
   res.status(410).json({ error: "Synchronous conversion is retired. Submit an authenticated processing job through PaperPilot." });
