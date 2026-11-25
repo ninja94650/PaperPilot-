@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { validateOOXMLArchive } from "./archive-validation.mjs";
 import { scanWithClamAv } from "./clamav.mjs";
 import { terminateProcessTree } from "./process-control.mjs";
+import { recordScan, recordJob, recordCleanup, recordQueuePollError, recordQueuePollSuccess, setWorkerBusy } from "./metrics.mjs";
 
 const api = (process.env.PAPERPILOT_API_URL || "").replace(/\/+$/, "");
 const token = process.env.DOCUMENT_WORKER_TOKEN || "";
@@ -129,6 +130,8 @@ async function scanOne() {
   const claimed = await call("/api/internal/processing/claim-scan", { workerId });
   if (!claimed.job) return false;
   const job = claimed.job;
+  const startedAt = Date.now();
+  let outcome = "failed";
   try {
     const bytes = await download(job.inputUrl, maxInputBytes);
     const result = await scanWithClamAv(bytes);
@@ -137,12 +140,15 @@ async function scanOne() {
       verdict: result.clean ? "clean" : "rejected",
       engine: "ClamAV", signatureVersion: result.signatureVersion
     });
+    outcome = result.clean ? "clean" : "rejected";
   } catch (error) {
     await call("/api/internal/processing/scan-result", {
       jobId: job.id, workerId, attempt: job.attempt, verdict: "failed",
       engine: "ClamAV", signatureVersion: "unavailable"
     }).catch(() => {});
     process.stderr.write("PaperPilot scan job " + job.id + " failed: " + String(error).slice(0,180) + "\n");
+  } finally {
+    recordScan(outcome, (Date.now() - startedAt) / 1000);
   }
   return true;
 }
@@ -151,11 +157,13 @@ async function processOne() {
   const claimed = await call("/api/internal/processing/claim", { workerId });
   if (!claimed.job) return false;
   const job = claimed.job;
+  const startedAt = Date.now();
   if (job.tool !== "office-to-pdf") {
     await call("/api/internal/processing/fail", {
       jobId: job.id, workerId, attempt: job.attempt,
       code: "unsupported_tool", message: "This worker does not support the requested tool."
     }).catch(() => {});
+    recordJob("failed", (Date.now() - startedAt) / 1000);
     return true;
   }
 
@@ -199,6 +207,7 @@ async function processOne() {
       jobId: job.id, workerId, attempt: job.attempt,
       storagePath: upload.storagePath, sizeBytes: pdf.byteLength
     });
+    recordJob("succeeded", (Date.now() - startedAt) / 1000);
   } catch (error) {
     await call("/api/internal/processing/fail", {
       jobId: job.id, workerId, attempt: job.attempt,
@@ -206,6 +215,7 @@ async function processOne() {
       message: String(error instanceof Error ? error.message : error).slice(0,350)
     }).catch(() => {});
     process.stderr.write("PaperPilot processing job " + job.id + " failed: " + String(error).slice(0,180) + "\n");
+    recordJob("failed", (Date.now() - startedAt) / 1000);
   } finally {
     clearInterval(heartbeat);
     controller.abort();
@@ -220,6 +230,9 @@ async function sweepOrphanedOutputs() {
   lastOutputCleanupAt = Date.now();
   try {
     const result = await call("/api/internal/processing/cleanup-outputs", { limit: 50 });
+    recordCleanup("removed", result.removed);
+    recordCleanup("invalid", result.invalid);
+    recordCleanup("error", result.errors);
     if (result.removed || result.invalid || result.errors) {
       process.stdout.write("PaperPilot output cleanup: " + JSON.stringify(result) + "\n");
     }
@@ -236,14 +249,18 @@ export function startQueueRunner() {
   const poll = async () => {
     if (stopped || busy) return;
     busy = true;
+    setWorkerBusy(true);
     try {
       await sweepOrphanedOutputs();
       const scanned = await scanOne();
       if (!scanned) await processOne();
+      recordQueuePollSuccess();
     } catch (error) {
+      recordQueuePollError();
       process.stderr.write("PaperPilot queue poll failed: " + String(error).slice(0,180) + "\n");
     } finally {
       busy = false;
+      setWorkerBusy(false);
       if (!stopped) setTimeout(poll, 2_000);
     }
   };
