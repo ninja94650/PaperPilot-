@@ -81,6 +81,8 @@ export default function Dashboard() {
   const [officeSourceFiles, setOfficeSourceFiles] = useState<Map<string, File>>(new Map());
   const [officeCloudLinks, setOfficeCloudLinks] = useState<Map<string, { documentId: string; parentRevisionId: string | null }>>(new Map());
   const routeToken = useRef(0);
+  const filesRef = useRef<File[]>(files);
+  filesRef.current = files;
 
   const activeFile = files[activeIndex] ?? null;
   const pdfFiles = files.filter(isPdf);
@@ -100,23 +102,20 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     void listRecoveredOfficeDrafts().then((drafts) => {
-      if (cancelled || drafts.length === 0) return;
-      setFiles((current) => {
-        if (current.length > 0) return current;
-        const recovered = drafts.map((draft) => draft.latestFile);
-        setActiveIndex(0);
-        setOfficeSessions(new Map(drafts.map((draft) => [draft.latestFile, draft.kind])));
-        setOfficeSessionIds(new Map(drafts.map((draft) => [draft.latestFile, draft.sessionId])));
-        setOfficeSourceFiles(new Map(drafts.map((draft) => [draft.sessionId, draft.sourceFile])));
-        setOfficeCloudLinks(new Map(drafts.filter((draft) => draft.cloudDocumentId).map((draft) => [draft.sessionId, {
-          documentId: draft.cloudDocumentId!,
-          parentRevisionId: draft.parentRevisionId
-        }])));
-        setEditing(true);
-        setNotice("Recovered " + drafts.length + " Office draft(s) from this browser. Your original files remain preserved.");
-        void routeToFile(recovered[0]);
-        return recovered;
-      });
+      if (cancelled || drafts.length === 0 || filesRef.current.length > 0) return;
+      const recovered = drafts.map((draft) => draft.latestFile);
+      setFiles(recovered);
+      setActiveIndex(0);
+      setOfficeSessions(new Map(drafts.map((draft) => [draft.latestFile, draft.kind])));
+      setOfficeSessionIds(new Map(drafts.map((draft) => [draft.latestFile, draft.sessionId])));
+      setOfficeSourceFiles(new Map(drafts.map((draft) => [draft.sessionId, draft.sourceFile])));
+      setOfficeCloudLinks(new Map(drafts.filter((draft) => draft.cloudDocumentId).map((draft) => [draft.sessionId, {
+        documentId: draft.cloudDocumentId!,
+        parentRevisionId: draft.parentRevisionId
+      }])));
+      setEditing(true);
+      setNotice("Recovered " + drafts.length + " Office draft(s) from this browser. Your original files remain preserved.");
+      void routeToFile(recovered[0]);
     }).catch((error) => {
       if (!cancelled) setNotice(error instanceof Error ? error.message : "Local Office draft recovery is unavailable.");
     });
