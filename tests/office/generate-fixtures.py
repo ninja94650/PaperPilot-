@@ -34,8 +34,7 @@ doc.save(docx_path)
 # PPTX: real master shape, slide text/table/image and speaker notes.
 prs = Presentation()
 master = prs.slide_masters[0]
-master_shape = master.shapes.add_textbox(Inches(0.4), Inches(0.15), Inches(8), Inches(0.35))
-master_shape.text = "PAPERPILOT MASTER KEEP"
+master.placeholders[0].text = "PAPERPILOT MASTER KEEP"
 slide = prs.slides.add_slide(prs.slide_layouts[6])
 title = slide.shapes.add_textbox(Inches(0.6), Inches(0.6), Inches(8), Inches(0.8))
 title.text = "PAPERPILOT PPTX EDIT TARGET"
