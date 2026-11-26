@@ -26,8 +26,8 @@ const accepted = ".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp";
 const tools: Tool[] = [
   { id: "merge", title: "Merge PDF", description: "Combine files into one clean document.", icon: Combine, tint: "violet", ready: true },
   { id: "split", title: "Split PDF", description: "Separate a document into smaller files.", icon: Scissors, tint: "blue", ready: true },
-  { id: "compress", title: "Compress PDF", description: "Reduce file size with quality controls.", icon: FileArchive, tint: "mint", ready: true },
-  { id: "convert", title: "Convert files", description: "PDF pages and images, plus Office worker conversion.", icon: FileImage, tint: "orange", ready: true },
+  { id: "compress", title: "Optimize PDF", description: "Compress with selectable quality; rasterized exports warn about flattened content.", icon: FileArchive, tint: "mint", ready: true },
+  { id: "convert", title: "Images ↔ PDF", description: "Convert images to PDF or PDF pages to PNG; Office conversion stays available through the secure worker.", icon: FileImage, tint: "orange", ready: true },
   { id: "annotate", title: "Edit PDF", description: "Add text notes to your pages.", icon: PenLine, tint: "pink", ready: true },
   { id: "sign", title: "Sign PDF", description: "Place a signature on your document.", icon: Signature, tint: "mint", ready: true },
   { id: "rotate", title: "Rotate PDF", description: "Fix page orientation in a click.", icon: RotateCw, tint: "blue", ready: true },
