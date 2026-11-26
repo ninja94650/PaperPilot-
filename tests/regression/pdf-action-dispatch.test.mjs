@@ -16,7 +16,15 @@ const count = (needle) => actionSource.split(needle).length - 1;
 test("image-to-PDF dispatch uses valid MIME and extension patterns", () => {
   assert.ok(actionSource.includes('/^image\\/(jpeg|png)$/i'));
   assert.ok(actionSource.includes('/\\.(jpe?g|png)$/i'));
-  assert.match(actionSource, /action === "convert"[\\s\\S]*?imageToPdf\\(images\\)/);
+  assert.ok(actionSource.includes('if (action === "convert")'));
+  assert.ok(actionSource.includes("imageToPdf(images)"));
+});
+
+test("the image-to-PDF toolbar guard uses the same valid patterns", () => {
+  const convertButtonLine = source.split("\n").find((line) => line.includes('runPdfAction("convert")'));
+  assert.ok(convertButtonLine, "Images to PDF action button must exist");
+  assert.ok(convertButtonLine.includes('/^image\\/(jpeg|png)$/i'));
+  assert.ok(convertButtonLine.includes('/\\.(jpe?g|png)$/i'));
 });
 
 test("split and compression dispatch each have exactly one branch", () => {
@@ -28,6 +36,7 @@ test("split and compression dispatch each have exactly one branch", () => {
 
 test("existing PDF operations remain wired", () => {
   for (const operation of [
+    "imageToPdf(images)",
     "mergePdfs(files)",
     "rotatePages(activeFile)",
     "extractPages(activeFile, pageRange)",

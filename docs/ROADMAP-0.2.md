@@ -9,6 +9,9 @@ Status: Month 1 — Foundation in progress. Project start: 24 November 2026. Las
 - **Main:** 8de023a485a95462bf957b2f9ea013b05d84a533. The runPdfAction source contains literal escaped newline tokens and duplicate split/compression branches. A minimal recovery is being prepared on fix/month1-main-build-recovery-20261126; image-to-PDF, merge, split, compression, rotate, extract, annotation and visual-signature dispatch are explicitly preserved.
 - **PR #7:** open and reported mergeable, 423 commits ahead / 0 behind at the last comparison. Its latest PR CI run (#350) passed all five jobs (build/security, database regression, ClamAV integration, Office conversion and browser round-trip). These results do not validate main.
 - **Vercel:** the latest available READY deployment is a preview from an earlier feature commit. The current PR head has no verified deployment because the Vercel Hobby daily deployment limit returned HTTP 402. Do not upgrade or retry by spending money.
+
+- **First recovery CI attempt:** commit 61386557f5e7ab3f6541efaf58178f190741334e repaired the malformed action function and removed duplicate branches, but CI caught a stale test assertion and a second doubled escape in the image toolbar guard. The follow-up fixes both.
+- **Dependency audit:** the generated main-matched lockfile reported PostCSS high-severity advisories and a Next.js moderate advisory inherited through PostCSS. The recovery adds a compatible PostCSS 8.5.23 override; the next CI run must confirm the audit is clean.
 - **Next gates:** commit a main-matched lockfile, inspect exact npm audit findings, pass CI/typecheck/build on the recovery branch, then continue upload quarantine, scanning and tenant-isolation verification. Keep Office Studio pilot-only until live cloud revision publication and malware-scan gates pass.
 - **Zero spend:** no paid service, trial or billable resource may be provisioned. A quota block is a release blocker, not permission to upgrade.
 
