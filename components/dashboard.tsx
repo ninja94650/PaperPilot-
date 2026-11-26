@@ -143,13 +143,39 @@ export default function Dashboard() {
     setBusy(true);
     setNotice("Working locally in your browser…");
     try {
-      if (action === "convert") {\n        const images = files.filter((file) => /^image\\/(jpeg|png)$/.test(file.type) || /\\.(jpe?g|png)$/i.test(file.name));\n        if (!images.length) throw new Error("Import one or more JPG or PNG images to convert them to PDF.");\n        const result = await imageToPdf(images);\n        const resultFile = createPdfFile(result.bytes, result.filename);\n        setFiles((current) => [...current, resultFile]); setActiveIndex(files.length);\n        setNotice("Converted " + images.length + " image(s) into " + resultFile.name + ".");\n      } else if (action === "merge") {
+      if (action === "convert") {
+        const images = files.filter((file) =>
+          /^image\/(jpeg|png)$/i.test(file.type) ||
+          /\.(jpe?g|png)$/i.test(file.name)
+        );
+        if (!images.length) throw new Error("Import one or more JPG or PNG images to convert them to PDF.");
+        const result = await imageToPdf(images);
+        const resultFile = createPdfFile(result.bytes, result.filename);
+        setFiles((current) => [...current, resultFile]);
+        setActiveIndex(files.length);
+        setNotice("Converted " + images.length + " image(s) into " + resultFile.name + ".");
+      } else if (action === "merge") {
         const merged = await mergePdfs(files);
         const resultFile = createPdfFile(merged.bytes, merged.filename);
         setFiles((current) => [...current, resultFile]);
         setActiveIndex(files.length);
         setNotice("Merged " + pdfFiles.length + " PDFs into " + resultFile.name + ".");
-      } else if (action === "split" && activeFile) {\n        const results = await splitPdf(activeFile);\n        const splitFiles = results.map((result) => createPdfFile(result.bytes, result.filename));\n        setFiles((current) => [...current, ...splitFiles]); setActiveIndex(files.length);\n        setNotice("Split into " + splitFiles.length + " individual page PDFs.");\n      } else if (action === "compress" && activeFile) {\n        const result = await optimizePdf(activeFile);\n        const resultFile = createPdfFile(result.bytes, result.filename);\n        setFiles((current) => [...current, resultFile]); setActiveIndex(files.length);\n        const delta = activeFile.size - resultFile.size;\n        setNotice(delta > 0 ? "Optimized PDF saved " + formatBytes(delta) + " (" + Math.round(delta / activeFile.size * 100) + "%) smaller." : "PDF structure repacked. This file did not become smaller; image recompression requires a separate engine.");\n      } else if (action === "split" && activeFile) {\n        const results = await splitPdf(activeFile); const splitFiles = results.map((result) => createPdfFile(result.bytes, result.filename));\n        setFiles((current) => [...current, ...splitFiles]); setActiveIndex(files.length); setNotice("Split into " + splitFiles.length + " individual page PDFs.");\n      } else if (action === "compress" && activeFile) {\n        const result = await optimizePdf(activeFile); const resultFile = createPdfFile(result.bytes, result.filename);\n        setFiles((current) => [...current, resultFile]); setActiveIndex(files.length); const delta = activeFile.size - resultFile.size;\n        setNotice(delta > 0 ? "Optimized PDF saved " + formatBytes(delta) + " (" + Math.round(delta / activeFile.size * 100) + "%) smaller." : "PDF structure repacked. It did not become smaller; image recompression needs a separate engine.");\n      } else if (action === "rotate" && activeFile) {
+      } else if (action === "split" && activeFile) {
+        const results = await splitPdf(activeFile);
+        const splitFiles = results.map((result) => createPdfFile(result.bytes, result.filename));
+        setFiles((current) => [...current, ...splitFiles]);
+        setActiveIndex(files.length);
+        setNotice("Split into " + splitFiles.length + " individual page PDFs.");
+      } else if (action === "compress" && activeFile) {
+        const result = await optimizePdf(activeFile);
+        const resultFile = createPdfFile(result.bytes, result.filename);
+        setFiles((current) => [...current, resultFile]);
+        setActiveIndex(files.length);
+        const delta = activeFile.size - resultFile.size;
+        setNotice(delta > 0
+          ? "Optimized PDF saved " + formatBytes(delta) + " (" + Math.round(delta / activeFile.size * 100) + "%) smaller."
+          : "PDF structure repacked. This file did not become smaller; image recompression requires a separate engine.");
+      } else if (action === "rotate" && activeFile) {
         const result = await rotatePages(activeFile);
         updateActiveFile(createPdfFile(result.bytes, result.filename));
       } else if (action === "extract" && activeFile) {
@@ -175,7 +201,6 @@ export default function Dashboard() {
       setBusy(false);
     }
   }
-
   function closeEditor() {
     setEditing(false);
     setShowTextPanel(null);
@@ -308,7 +333,7 @@ export default function Dashboard() {
               <div className="editor-toolbar">
                 <div className="editor-document-title"><FileText size={16} /><span>{activeFile?.name ?? "No file selected"}</span></div>
                 <div className="editor-actions">
-                  <button onClick={() => runPdfAction("rotate")} disabled={busy || !activeFile || !isPdf(activeFile)}><RotateCw size={15} /><span>Rotate</span></button><button onClick={() => runPdfAction("split")} disabled={busy || !activeFile || !isPdf(activeFile)}><Scissors size={15} /><span>Split</span></button><button onClick={() => runPdfAction("compress")} disabled={busy || !activeFile || !isPdf(activeFile)}><FileArchive size={15} /><span>Optimize</span></button><button onClick={() => runPdfAction("convert")} disabled={busy || !files.some((file) => /^image\\/(jpeg|png)$/.test(file.type) || /\\.(jpe?g|png)$/i.test(file.name))}><FileImage size={15} /><span>Images to PDF</span></button>
+                  <button onClick={() => runPdfAction("rotate")} disabled={busy || !activeFile || !isPdf(activeFile)}><RotateCw size={15} /><span>Rotate</span></button><button onClick={() => runPdfAction("split")} disabled={busy || !activeFile || !isPdf(activeFile)}><Scissors size={15} /><span>Split</span></button><button onClick={() => runPdfAction("compress")} disabled={busy || !activeFile || !isPdf(activeFile)}><FileArchive size={15} /><span>Optimize</span></button><button onClick={() => runPdfAction("convert")} disabled={busy || !files.some((file) => /^image\/(jpeg|png)$/i.test(file.type) || /\.(jpe?g|png)$/i.test(file.name))}><FileImage size={15} /><span>Images to PDF</span></button>
                   <button onClick={() => setShowTextPanel("annotate")} disabled={busy || !activeFile || !isPdf(activeFile)}><PenLine size={15} /><span>Text note</span></button>
                   <button onClick={() => setShowTextPanel("sign")} disabled={busy || !activeFile || !isPdf(activeFile)}><Signature size={15} /><span>Sign</span></button>
                   <button className="download-action" onClick={() => activeFile && makeDownload(activeFile)} disabled={!activeFile}><Download size={15} /><span>Download</span></button>

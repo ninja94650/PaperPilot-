@@ -1,6 +1,33 @@
 # PaperPilot 0.2 — Advanced Document Workspace
 
-Status: planned. This document defines the implementation sequence; listed capabilities are not yet claimed as shipped.
+Status: Month 1 — Foundation in progress. Project start: 24 November 2026. Last reviewed: 26 November 2026. Capabilities remain unshipped until their acceptance tests and security gates pass.
+
+
+## Current engineering checkpoint — 26 November 2026
+
+- **Schedule of record:** Month 1 — Foundation. The project start is recorded as 24 November 2026; do not advance to Month 2 while foundation gates remain open.
+- **Main:** 8de023a485a95462bf957b2f9ea013b05d84a533 remains unchanged. Recovery branch head: 33209f55bfc10388b242709a15b11ac18148a596. It repairs the escaped image-to-PDF dispatch, removes duplicate split/compression branches and duplicate PDF helper exports, and preserves image-to-PDF, merge, split, compression, rotate, extract, annotation and visual-signature dispatch.
+- **PR #7:** open and reported mergeable, 423 commits ahead / 0 behind at the last comparison. Its latest PR CI run (#350) passed all five jobs (build/security, database regression, ClamAV integration, Office conversion and browser round-trip). These results do not validate main.
+- **Vercel:** recovery preview for the exact branch head 33209f55bfc10388b242709a15b11ac18148a596 is READY at https://paperpilot-8xco4dg2q-ninja94650-5268.vercel.app. This is a preview only, not production.
+
+- **First recovery CI attempt:** commit 61386557f5e7ab3f6541efaf58178f190741334e repaired the malformed action function and removed duplicate branches, but CI caught a stale test assertion and a second doubled escape in the image toolbar guard. The follow-up fixes both.
+- **Dependency audit:** the main-matched root lockfile is committed. PostCSS is constrained by a ^8.5.23 security override and resolves to 8.5.33. The recovery CI audit reports 0 vulnerabilities (0 info, low, moderate, high or critical).
+- **Typecheck follow-up:** CI also exposed duplicate exported implementations of splitPdf, optimizePdf and imageToPdf in lib/pdf-tools.ts. The first complete implementations are retained; duplicate blocks are removed and a regression test now enforces one export per helper.
+- **Generated repository artefacts:** docs/licensing-register.md records 12 direct dependencies/overrides with allowlisted MIT, ISC or Apache-2.0 licences; sbom.cdx.json is CycloneDX 1.5 with 50 components and 51 dependency relationships. Transitive licence obligations still need release review.
+- **Recovery CI:** run #3 on code commit e275c30bee0e8fb73e16be290589e976813de8f3 passed regression tests, licence generation, SBOM generation, typecheck and production build. The next run verifies the committed lockfile on the exact latest branch head.
+- **Committed-lockfile verification:** CI run #4 on commit eba528cd983c66dbb68e71ac6e8ee8956ae35b6d passed using the committed lockfile: npm ci, npm audit (0 vulnerabilities), 6/6 regression tests, licensing-register generation, CycloneDX SBOM generation, typecheck and production build. Its artifact commit refreshed the SBOM on branch head 66a71a11d15d5699490fce818a3c0cad5e5e5c37; the exact latest head has a READY Vercel preview.
+- **CI housekeeping:** foundation checkout now fetches full history so the SBOM refresh check can reliably detect lockfile changes and avoid timestamp-only SBOM commits on every run.
+- **Next gates:** verify CI against the committed lockfile, open a small recovery PR, then continue upload quarantine, scanning and tenant-isolation verification. Keep Office Studio pilot-only until live cloud revision publication and malware-scan gates pass.
+- **Zero spend:** no paid service, trial or billable resource may be provisioned. A quota block is a release blocker, not permission to upgrade.
+
+## Approved six-month delivery schedule
+
+1. **Month 1 — Foundation:** authentication, tenant/account model, database, private storage, upload validation/quarantine/security, cloud infrastructure, API/OpenAPI contracts, CI/CD, threat model and licensing register.
+2. **Month 2 — Processing Engine:** merge, split, extract, reorder, rotate, compression tiers, image↔PDF, PDF→image, asynchronous job state machine, queue/retry/DLQ, progress/reconnect and validation.
+3. **Month 3 — Built-in Editor + MVP:** PDF.js preview/thumbnails/search, page controls, annotations/overlays/forms/metadata, immutable revisions, responsive UI, DOCX/PPTX preview and Office-editor integration evaluation/proof-of-concept only if a genuinely free production-usable licence exists.
+4. **Month 4 — Advanced Processing:** OCRmyPDF/Tesseract workers and language packs, searchable PDFs, batch fan-out/fan-in, billing/usage scaffolding, API keys, JavaScript and Python SDKs.
+5. **Month 5 — Enterprise:** RBAC, SSO evaluation, audit logs, retention controls, security hardening, malware/CDR tuning, autoscaling design, load/resilience tests and advanced editing evaluation.
+6. **Month 6 — Production Launch:** penetration/security testing, remediation, load testing, monitoring/SLIs/SLOs, backups/disaster recovery drills, data export/deletion, runbooks and staged public-launch readiness.
 
 ## Release goals
 
