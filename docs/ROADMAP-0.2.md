@@ -1,6 +1,25 @@
 # PaperPilot 0.2 — Advanced Document Workspace
 
-Status: planned. This document defines the implementation sequence; listed capabilities are not yet claimed as shipped.
+Status: Month 1 — Foundation in progress. Project start: 24 November 2026. Last reviewed: 26 November 2026. Capabilities remain unshipped until their acceptance tests and security gates pass.
+
+
+## Current engineering checkpoint — 26 November 2026
+
+- **Schedule of record:** Month 1 — Foundation. The project start is recorded as 24 November 2026; do not advance to Month 2 while foundation gates remain open.
+- **Main:** 8de023a485a95462bf957b2f9ea013b05d84a533. The runPdfAction source contains literal escaped newline tokens and duplicate split/compression branches. A minimal recovery is being prepared on fix/month1-main-build-recovery-20261126; image-to-PDF, merge, split, compression, rotate, extract, annotation and visual-signature dispatch are explicitly preserved.
+- **PR #7:** open and reported mergeable, 423 commits ahead / 0 behind at the last comparison. Its latest PR CI run (#350) passed all five jobs (build/security, database regression, ClamAV integration, Office conversion and browser round-trip). These results do not validate main.
+- **Vercel:** the latest available READY deployment is a preview from an earlier feature commit. The current PR head has no verified deployment because the Vercel Hobby daily deployment limit returned HTTP 402. Do not upgrade or retry by spending money.
+- **Next gates:** commit a main-matched lockfile, inspect exact npm audit findings, pass CI/typecheck/build on the recovery branch, then continue upload quarantine, scanning and tenant-isolation verification. Keep Office Studio pilot-only until live cloud revision publication and malware-scan gates pass.
+- **Zero spend:** no paid service, trial or billable resource may be provisioned. A quota block is a release blocker, not permission to upgrade.
+
+## Approved six-month delivery schedule
+
+1. **Month 1 — Foundation:** authentication, tenant/account model, database, private storage, upload validation/quarantine/security, cloud infrastructure, API/OpenAPI contracts, CI/CD, threat model and licensing register.
+2. **Month 2 — Processing Engine:** merge, split, extract, reorder, rotate, compression tiers, image↔PDF, PDF→image, asynchronous job state machine, queue/retry/DLQ, progress/reconnect and validation.
+3. **Month 3 — Built-in Editor + MVP:** PDF.js preview/thumbnails/search, page controls, annotations/overlays/forms/metadata, immutable revisions, responsive UI, DOCX/PPTX preview and Office-editor integration evaluation/proof-of-concept only if a genuinely free production-usable licence exists.
+4. **Month 4 — Advanced Processing:** OCRmyPDF/Tesseract workers and language packs, searchable PDFs, batch fan-out/fan-in, billing/usage scaffolding, API keys, JavaScript and Python SDKs.
+5. **Month 5 — Enterprise:** RBAC, SSO evaluation, audit logs, retention controls, security hardening, malware/CDR tuning, autoscaling design, load/resilience tests and advanced editing evaluation.
+6. **Month 6 — Production Launch:** penetration/security testing, remediation, load testing, monitoring/SLIs/SLOs, backups/disaster recovery drills, data export/deletion, runbooks and staged public-launch readiness.
 
 ## Release goals
 

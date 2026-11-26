@@ -1,0 +1,52 @@
+name: PaperPilot foundation recovery
+on:
+  push:
+    branches:
+      - fix/month1-main-build-recovery-20261126
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: paperpilot-foundation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.16.0"
+      - name: Bootstrap a lockfile only when the repository does not yet have one
+        if: ${{ hashFiles('package-lock.json') == '' }}
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install from the generated or committed lockfile
+        run: npm ci
+      - name: Capture complete dependency audit report
+        run: npm audit --json > npm-audit.json || true
+      - name: Enforce high and critical dependency audit gate
+        id: audit
+        continue-on-error: true
+        run: npm audit --audit-level=high
+      - name: Run PDF action dispatch regression tests
+        run: npm run test:regression
+      - name: Type check
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+      - name: Upload bootstrap lockfile and audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paperpilot-foundation-${{ github.sha }}
+          path: |
+            package-lock.json
+            npm-audit.json
+          if-no-files-found: warn
+      - name: Fail if dependency audit did not pass
+        if: steps.audit.outcome == 'failure'
+        run: exit 1
