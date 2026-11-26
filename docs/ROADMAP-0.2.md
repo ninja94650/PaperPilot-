@@ -6,14 +6,16 @@ Status: Month 1 — Foundation in progress. Project start: 24 November 2026. Las
 ## Current engineering checkpoint — 26 November 2026
 
 - **Schedule of record:** Month 1 — Foundation. The project start is recorded as 24 November 2026; do not advance to Month 2 while foundation gates remain open.
-- **Main:** 8de023a485a95462bf957b2f9ea013b05d84a533. The runPdfAction source contains literal escaped newline tokens and duplicate split/compression branches. A minimal recovery is being prepared on fix/month1-main-build-recovery-20261126; image-to-PDF, merge, split, compression, rotate, extract, annotation and visual-signature dispatch are explicitly preserved.
+- **Main:** 8de023a485a95462bf957b2f9ea013b05d84a533 remains unchanged. Recovery branch head: 33209f55bfc10388b242709a15b11ac18148a596. It repairs the escaped image-to-PDF dispatch, removes duplicate split/compression branches and duplicate PDF helper exports, and preserves image-to-PDF, merge, split, compression, rotate, extract, annotation and visual-signature dispatch.
 - **PR #7:** open and reported mergeable, 423 commits ahead / 0 behind at the last comparison. Its latest PR CI run (#350) passed all five jobs (build/security, database regression, ClamAV integration, Office conversion and browser round-trip). These results do not validate main.
-- **Vercel:** the latest available READY deployment is a preview from an earlier feature commit. The current PR head has no verified deployment because the Vercel Hobby daily deployment limit returned HTTP 402. Do not upgrade or retry by spending money.
+- **Vercel:** recovery preview for the exact branch head 33209f55bfc10388b242709a15b11ac18148a596 is READY at https://paperpilot-8xco4dg2q-ninja94650-5268.vercel.app. This is a preview only, not production.
 
 - **First recovery CI attempt:** commit 61386557f5e7ab3f6541efaf58178f190741334e repaired the malformed action function and removed duplicate branches, but CI caught a stale test assertion and a second doubled escape in the image toolbar guard. The follow-up fixes both.
-- **Dependency audit:** the generated main-matched lockfile reported PostCSS high-severity advisories and a Next.js moderate advisory inherited through PostCSS. The recovery adds a compatible PostCSS 8.5.23 override; the next CI run must confirm the audit is clean.
+- **Dependency audit:** the main-matched root lockfile is committed. PostCSS is constrained by a ^8.5.23 security override and resolves to 8.5.33. The recovery CI audit reports 0 vulnerabilities (0 info, low, moderate, high or critical).
 - **Typecheck follow-up:** CI also exposed duplicate exported implementations of splitPdf, optimizePdf and imageToPdf in lib/pdf-tools.ts. The first complete implementations are retained; duplicate blocks are removed and a regression test now enforces one export per helper.
-- **Next gates:** commit a main-matched lockfile, inspect exact npm audit findings, pass CI/typecheck/build on the recovery branch, then continue upload quarantine, scanning and tenant-isolation verification. Keep Office Studio pilot-only until live cloud revision publication and malware-scan gates pass.
+- **Generated repository artefacts:** docs/licensing-register.md records 12 direct dependencies/overrides with allowlisted MIT, ISC or Apache-2.0 licences; sbom.cdx.json is CycloneDX 1.5 with 50 components and 51 dependency relationships. Transitive licence obligations still need release review.
+- **Recovery CI:** run #3 on code commit e275c30bee0e8fb73e16be290589e976813de8f3 passed regression tests, licence generation, SBOM generation, typecheck and production build. The next run verifies the committed lockfile on the exact latest branch head.
+- **Next gates:** verify CI against the committed lockfile, open a small recovery PR, then continue upload quarantine, scanning and tenant-isolation verification. Keep Office Studio pilot-only until live cloud revision publication and malware-scan gates pass.
 - **Zero spend:** no paid service, trial or billable resource may be provisioned. A quota block is a release blocker, not permission to upgrade.
 
 ## Approved six-month delivery schedule
