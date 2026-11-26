@@ -257,7 +257,8 @@ export default function Dashboard() {
         const resultFile = createPdfFile(merged.bytes, merged.filename);
         setFiles((current) => [...current, resultFile]);
         setActiveIndex(files.length);
-        setNotice("Merged " + pdfFiles.length + " PDFs into " + resultFile.name + ".");
+        await routeToFile(resultFile);
+        setNotice("Merged " + pdfFiles.length + " PDFs into one editable working document. Reorder or remove pages, review the result, then download when ready.");
       } else if (action === "rotate" && activeFile) {
         const result = await rotatePages(activeFile);
         updateActiveFile(createPdfFile(result.bytes, result.filename));
@@ -529,7 +530,7 @@ export default function Dashboard() {
                 })}
               </div>
               <div className="editor-bottom-bar">
-                <span><span className="status-dot" /> {activeFile ? editorLabel(activeEditorKind) + (activeEditorKind === "pdf" ? " ready" : " selected") : "Waiting for a file"}</span>
+                <span><span className="status-dot" /> {activeFile ? editorLabel(activeEditorKind) + (activeEditorKind === "pdf" ? " · temporary working copy" : " selected") : "Waiting for a file"}</span>
                 <div className="bottom-actions">
                   <>{activeTool === "split" && <button onClick={() => runPdfAction("split")} disabled={busy || !activeFile || !isPdf(activeFile)}><Scissors size={14} /> Split into pages</button>}<button onClick={() => runPdfAction("merge")} disabled={busy || pdfFiles.length < 2}><Combine size={14} /> Merge {pdfFiles.length > 0 ? "PDFs (" + pdfFiles.length + ")" : "PDFs"}</button></>
                   <div className="range-control"><span>Pages</span><input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="Page range to extract" placeholder="1, 3-5" /><button onClick={() => runPdfAction("extract")} disabled={busy || !activeFile || !isPdf(activeFile)}>Extract</button></div>
