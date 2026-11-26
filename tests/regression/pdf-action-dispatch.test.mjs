@@ -50,3 +50,13 @@ test("existing PDF operations remain wired", () => {
 test("the action function contains real line breaks, not escaped newline tokens", () => {
   assert.equal(actionSource.includes("\\n"), false);
 });
+
+const pdfToolsUrl = new URL("../../lib/pdf-tools.ts", import.meta.url);
+const pdfToolsSource = await readFile(pdfToolsUrl, "utf8");
+
+test("PDF utility exports are defined exactly once", () => {
+  for (const exportName of ["splitPdf", "optimizePdf", "imageToPdf"]) {
+    const needle = "export async function " + exportName;
+    assert.equal(pdfToolsSource.split(needle).length - 1, 1, exportName + " must have one implementation");
+  }
+});

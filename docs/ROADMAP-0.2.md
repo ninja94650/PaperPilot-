@@ -12,6 +12,7 @@ Status: Month 1 — Foundation in progress. Project start: 24 November 2026. Las
 
 - **First recovery CI attempt:** commit 61386557f5e7ab3f6541efaf58178f190741334e repaired the malformed action function and removed duplicate branches, but CI caught a stale test assertion and a second doubled escape in the image toolbar guard. The follow-up fixes both.
 - **Dependency audit:** the generated main-matched lockfile reported PostCSS high-severity advisories and a Next.js moderate advisory inherited through PostCSS. The recovery adds a compatible PostCSS 8.5.23 override; the next CI run must confirm the audit is clean.
+- **Typecheck follow-up:** CI also exposed duplicate exported implementations of splitPdf, optimizePdf and imageToPdf in lib/pdf-tools.ts. The first complete implementations are retained; duplicate blocks are removed and a regression test now enforces one export per helper.
 - **Next gates:** commit a main-matched lockfile, inspect exact npm audit findings, pass CI/typecheck/build on the recovery branch, then continue upload quarantine, scanning and tenant-isolation verification. Keep Office Studio pilot-only until live cloud revision publication and malware-scan gates pass.
 - **Zero spend:** no paid service, trial or billable resource may be provisioned. A quota block is a release blocker, not permission to upgrade.
 
