@@ -321,7 +321,7 @@ export default function Dashboard() {
         <div className="hero-copy">
           <div className="eyebrow"><span className="eyebrow-dot" /> YOUR DOCUMENTS, IN GOOD HANDS</div>
           <h1>Less paperwork.<br /><span>More possibility.</span></h1>
-          <p className="hero-description">Everything you need to work with documents, all in one thoughtfully simple workspace. Edit, organize and get things done.</p>
+          <p className="hero-description">Edit PDFs, Word documents, presentations and images in one workspace. Convert, organize and keep your files moving.</p>
           <div className="hero-actions">
             <button className="primary-button" onClick={() => document.getElementById("upload-zone")?.scrollIntoView({ behavior: "smooth" })}>Start with a file <ArrowRight size={17} /></button>
             <a className="quiet-link" href="#tools">Explore all tools <span>↓</span></a>
@@ -366,6 +366,28 @@ export default function Dashboard() {
         </div>}
       </section>
 
+      <section id="editors" className="tools-section" style={{ paddingTop: 12 }}>
+        <div className="tools-heading">
+          <div><div className="section-kicker">BUILT-IN DOCUMENT EDITORS</div><h2>Open the right studio for every file.</h2><p>Import a document and PaperPilot routes it to its matching editor automatically.</p></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
+          {[
+            { title: "PDF Studio", detail: "Preview pages, reorder, delete, rotate, annotate, sign, extract and export.", status: "AVAILABLE", tint: "#eaf4ff", icon: "PDF" },
+            { title: "Word Studio", detail: "Edit DOCX documents in the built-in browser editor with local autosave and revisions.", status: "PILOT", tint: "#eaf0ff", icon: "DOCX" },
+            { title: "Presentation Studio", detail: "Edit PPTX slides in the built-in browser editor with local autosave and revisions.", status: "PILOT", tint: "#fff1e8", icon: "PPTX" },
+            { title: "Image Studio", detail: "Crop by resizing, rotate, flip, adjust brightness, contrast and saturation, then export.", status: "AVAILABLE", tint: "#e9f7ef", icon: "IMG" }
+          ].map((studio) => <button key={studio.title} type="button" onClick={() => { document.getElementById("file-picker")?.click(); setNotice("Choose a " + studio.title.replace(" Studio", "") + " file. PaperPilot will detect its format and open the matching editor."); }} style={{ textAlign: "left", border: "1px solid #e5ece6", borderRadius: 13, padding: 18, background: "#fff", display: "flex", flexDirection: "column", gap: 12, minHeight: 166, boxShadow: "0 5px 18px rgba(32,65,43,.04)" }}>
+            <span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ display: "grid", placeItems: "center", width: 43, height: 36, borderRadius: 9, background: studio.tint, color: "#386e50", fontSize: 11, fontWeight: 850 }}>{studio.icon}</span>
+              <span style={{ color: studio.status === "AVAILABLE" ? "#36815a" : "#9b7137", background: studio.status === "AVAILABLE" ? "#edf7f0" : "#fff6e8", borderRadius: 20, padding: "5px 8px", fontSize: 8, letterSpacing: .6, fontWeight: 850 }}>{studio.status}</span>
+            </span>
+            <span style={{ display: "grid", gap: 5 }}><b style={{ fontSize: 14, color: "#24382b" }}>{studio.title}</b><small style={{ fontSize: 11, lineHeight: 1.55, color: "#78857c" }}>{studio.detail}</small></span>
+            <span style={{ color: "#347a55", fontSize: 10, fontWeight: 800 }}>Choose a file <ArrowRight size={13} style={{ verticalAlign: "middle" }} /></span>
+          </button>)}
+        </div>
+        <p style={{ marginTop: 12, color: "#8b968e", fontSize: 10 }}>Word and Presentation editors remain pilot-only while full document round-trip and malware-scanning release checks are completed. Originals are preserved.</p>
+      </section>
+
       <section id="tools" className="tools-section">
         <div className="tools-heading"><div><div className="section-kicker">THE TOOLKIT</div><h2>One place for every page.</h2><p>Small tasks, big projects — make every document work harder.</p></div>
           <div className="tool-search"><FileSearch size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a tool..." aria-label="Search tools" /></div>
@@ -374,7 +396,7 @@ export default function Dashboard() {
           <span className={"tool-icon " + tool.tint}><Icon size={21} strokeWidth={1.9} /></span><span className="tool-card-content"><b>{tool.title}</b><small>{tool.description}</small></span>
           {tool.label ? <span className="coming-label">{tool.label}</span> : <ArrowUpRight className="tool-arrow" size={17} />}
         </button>; })}</div>
-        <div className="more-tools-note"><Sparkles size={16} /> Browser tools are ready; Office conversion and cloud editing need connected services. <a href="#roadmap">See integration notes</a></div>
+        <div className="more-tools-note"><Sparkles size={16} /> PDF, image and OCR tools are available in-browser. Word and Presentation Studio are pilot integrations; private cloud history is available after sign-in.</div>
       </section>
 
       <section id="how-it-works" className="how-section">
@@ -387,8 +409,8 @@ export default function Dashboard() {
       </section>
 
       <section id="roadmap" className="roadmap-section"><div className="roadmap-card">
-        <div className="roadmap-copy"><div className="section-kicker">THE PAPERPILOT PROMISE</div><h2>A little less admin.<br /><span>A lot more momentum.</span></h2><p>We’re building a thoughtful home for every document — with conversion, OCR, cloud projects and team workspaces next.</p><button className="light-button" onClick={() => setNotice("Thanks for exploring PaperPilot. More tools are being built.")}>Explore the roadmap <ArrowRight size={16} /></button></div>
-        <div className="roadmap-list"><div><span className="roadmap-check"><Check size={14} /></span><span><b>PDF essentials</b><small>Available in this first build</small></span><BadgeCheck size={18} /></div><div><span className="roadmap-number">02</span><span><b>Office conversion</b><small>DOCX, PPTX and image workflows</small></span><span className="roadmap-tag">NEXT UP</span></div><div><span className="roadmap-number">03</span><span><b>OCR & smart documents</b><small>Searchable scans and batch tools</small></span><span className="roadmap-tag">PLANNED</span></div><div><span className="roadmap-number">04</span><span><b>Cloud workspace</b><small>Accounts, history and team sharing</small></span><span className="roadmap-tag">PLANNED</span></div></div>
+        <div className="roadmap-copy"><div className="section-kicker">THE PAPERPILOT PROMISE</div><h2>A little less admin.<br /><span>A lot more momentum.</span></h2><p>Your document workspace is taking shape: PDF and image editing, OCR, account-backed cloud history, and built-in Word and Presentation studios.</p><button className="light-button" onClick={() => setNotice("Thanks for exploring PaperPilot. More tools are being built.")}>Explore the roadmap <ArrowRight size={16} /></button></div>
+        <div className="roadmap-list"><div><span className="roadmap-check"><Check size={14} /></span><span><b>PDF & image editors</b><small>Page workspace and Image Studio</small></span><span className="roadmap-tag">AVAILABLE</span></div><div><span className="roadmap-number">02</span><span><b>Word & Presentation Studio</b><small>Built-in DOCX and PPTX editors</small></span><span className="roadmap-tag">PILOT</span></div><div><span className="roadmap-number">03</span><span><b>OCR & smart documents</b><small>Text recognition and searchable PDF export</small></span><span className="roadmap-tag">AVAILABLE</span></div><div><span className="roadmap-number">04</span><span><b>Private cloud workspace</b><small>Sign-in, document library and revision history</small></span><span className="roadmap-tag">AVAILABLE</span></div><div><span className="roadmap-number">05</span><span><b>Team workspaces</b><small>Shared projects and collaboration controls</small></span><span className="roadmap-tag">PLANNED</span></div></div>
       </div></section>
 
       <footer className="site-footer"><a className="brand footer-brand" href="#"><span className="brand-mark"><FileStack size={18} /></span><span>paper<span className="brand-accent">pilot</span><i>.</i></span></a><span>Thoughtful tools for the documents that move you.</span><span>© 2026 PaperPilot</span></footer>
