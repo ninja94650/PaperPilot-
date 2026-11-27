@@ -1,6 +1,36 @@
-# PaperPilot 0.2 — Advanced Document Workspace
+Status: Month 1 — Foundation in progress. Project start: 24 November 2026. Last reviewed: 27 November 2026.
 
-Status: planned. This document defines the implementation sequence; listed capabilities are not yet claimed as shipped.
+## Current engineering checkpoint — 27 November 2026
+
+- **Schedule of record:** Month 1 — Foundation. Do not advance to Month 2 while authentication, tenant isolation, secure upload, private storage, API contracts, threat model and release gates remain incomplete.
+- **Current main:** `12872cb7fca9c93d878dba0ab13eb3426f8e291d`. The current component-based dashboard is active; the older malformed `runPdfAction` block is not present in this implementation. The inspected PDF helper exports are unique.
+- **Production:** Vercel deployment `dpl_suBim8Tq3Mnd7gdSxosdGhwNXrQw` is READY for the exact main SHA. This verifies the hosting build only, not secure document-processing readiness.
+- **CI baseline:** [PR #9](https://github.com/ninja94650/PaperPilot-/pull/9) adds a read-only GitHub Actions workflow, functional PDF tests, a PostCSS 8.5.33 security override and lockfile, direct-dependency licence register, and CycloneDX SBOM/audit artifacts. The workflow has `contents: read` only and never pushes generated commits.
+- **Verified first CI run:** [run #354](https://github.com/ninja94650/PaperPilot-/actions/runs/45982736449) passed on commit `43f61b2a2478a6bc88b8cb5d8eec2bdff30d6b50`: `npm ci`, `npm audit --audit-level=high` (0 vulnerabilities), 12/12 functional/workspace tests, licensing-register generation and drift check, CycloneDX SBOM generation/validation, TypeScript typecheck and Next.js production build. The run uploaded the SBOM and npm audit report as a workflow artifact.
+- **Preview:** the exact first PR #9 head has a READY preview at https://paperpilot-e0o92n5fb-ninja94650-5268.vercel.app. It is not production.
+- **Older PRs:** PR #8 is non-mergeable against the newer main and overlaps the current dashboard implementation; do not merge it wholesale. PR #7 is a separate Office workspace branch based on older main; its tests apply only to that branch.
+- **Upload security blocker:** current `handleSaveToCloud` uploads directly to the private `documents` bucket and inserts metadata with status `ready`. There is no quarantine/scan-pending promotion gate. Private bucket/RLS policies do not replace magic-byte validation, malware scanning, OOXML expansion limits or isolated workers.
+- **Supabase guardrail:** no Supabase schema, auth or storage changes were made; the installed skill catalogue returned no Supabase skill.
+- **Vercel quota:** the team is on Hobby. Exact remaining deployment headroom and account-wide spend are not exposed by the available API. No manual deployment or paid provisioning was performed.
+
+## Approved six-month delivery schedule of record
+
+1. **Month 1 — Foundation:** authentication, tenant/account model, database, private storage, upload validation/quarantine/security, cloud infrastructure, API/OpenAPI contracts, CI/CD, threat model and licensing register.
+2. **Month 2 — Processing Engine:** merge, split, extract, reorder, rotate, compression tiers, image↔PDF, PDF→image, asynchronous job state machine, queue/retry/DLQ, progress/reconnect and validation.
+3. **Month 3 — Built-in Editor + MVP:** PDF.js preview/thumbnails/search, page controls, annotations/overlays/forms/metadata, immutable revisions, responsive UI, DOCX/PPTX preview and Office-editor evaluation/proof-of-concept only if a genuinely free production-usable licence exists.
+4. **Month 4 — Advanced Processing:** OCRmyPDF/Tesseract workers and language packs, searchable PDFs, batch fan-out/fan-in, billing/usage scaffolding, API keys, JavaScript and Python SDKs.
+5. **Month 5 — Enterprise:** RBAC, SSO evaluation, audit logs, retention controls, security hardening, malware/CDR tuning, autoscaling design, load/resilience tests and advanced editing evaluation.
+6. **Month 6 — Production Launch:** penetration/security testing, remediation, load testing, monitoring/SLIs/SLOs, backups/disaster recovery drills, data export/deletion, runbooks and staged public-launch readiness.
+
+## Next Month 1 priorities
+
+1. Finish review of PR #9 and verify its latest exact-head CI run after this documentation update.
+2. Implement quarantine upload intents and fail-closed scan state transitions; prevent preview/processing until clean-object promotion.
+3. Add authoritative magic-byte/type validation, archive/XML expansion limits, malware scanning and safe output promotion.
+4. Verify tenant-scoped private object access, signed URL expiry, retention and deletion end-to-end.
+5. Verify Supabase Auth redirects and actual confirmation-email delivery; complete the threat model and OpenAPI contracts.
+6. Review transitive licences and the SBOM before any public release.
+
 
 ## Release goals
 
