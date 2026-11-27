@@ -1,0 +1,57 @@
+name: PaperPilot CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: paperpilot-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.16.0"
+          cache: npm
+      - name: Install exact locked dependencies
+        run: npm ci
+      - name: Capture dependency audit report
+        shell: bash
+        run: npm audit --json > "$RUNNER_TEMP/npm-audit.json" || true
+      - name: Fail on high or critical dependency advisories
+        run: npm audit --audit-level=high
+      - name: Run PDF and workspace regression tests
+        run: npm run test:regression
+      - name: Regenerate and verify the direct dependency licence register
+        shell: bash
+        run: |
+          npm run licensing:generate
+          git diff --exit-code -- docs/licensing-register.md
+      - name: Generate and validate CycloneDX SBOM
+        shell: bash
+        run: |
+          npm sbom --sbom-format cyclonedx > "$RUNNER_TEMP/sbom.cdx.json"
+          node -e "const fs = require('node:fs'); const bom = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/sbom.cdx.json', 'utf8')); if (!Array.isArray(bom.components) || bom.components.length === 0) throw new Error('SBOM has no components');"
+      - name: Type check
+        run: npm run typecheck
+      - name: Build production application
+        run: npm run build
+      - name: Upload audit report and SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paperpilot-supply-chain-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/npm-audit.json
+            ${{ runner.temp }}/sbom.cdx.json
+          if-no-files-found: warn
