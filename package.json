@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test",
+    "test:regression": "node --experimental-strip-types --test",
+    "licensing:generate": "node scripts/generate-licensing-register.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.7.0",
@@ -22,5 +25,8 @@
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "typescript": "^5.7.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.23"
   }
 }
